@@ -47,6 +47,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "build": "tsc -p tsconfig.json && tsdown",
     "bundle": "pnpm run build",
+    "dev": "tsc -p tsconfig.json && tsdown --watch",
     "test": "vitest run"
   },
   "license": "MIT",

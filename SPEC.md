@@ -33,7 +33,7 @@
 | [Breakpeek.module.css](src/client/Breakpeek.module.css) | 右下角定位、布局、外观与入场动画 | 转为摘要／详情两种布局及完整主题 token |
 | [src/invariant.ts](src/invariant.ts) | 注册空 invariant installer，理由是没有跨插件可变数据 | 实施后重新判断是否存在需要验证的数据关系 |
 | [组件测试](tests/breakpeek.client.spec.tsx) | 描述显示开关、手动前后切换、定时轮转及点击关闭 | 补充注册释放与真实组装验证 |
-| [tsconfig.json](tsconfig.json)、[tsdown.config.ts](tsdown.config.ts)、[build/client-bundle.ts](build/client-bundle.ts) | 包内自包含的 TypeScript 配置与 lazy-CJS Client 构建 | 不依赖仓库共享构建预设，确保浏览器实际加载更新后的 bundle |
+| [tsconfig.json](tsconfig.json)、[tsdown.config.ts](tsdown.config.ts)、[build/client-bundle.ts](build/client-bundle.ts) | 包内自包含的 TypeScript 配置、lazy-CJS Client 构建与 `pnpm dev` watcher | 不依赖仓库共享构建预设，确保浏览器实际加载更新后的 bundle |
 
 宿主接入由安装该包的 DSH Profile 配置负责。`dsh.client.inject` 是包依赖信息，不负责运行时先后顺序；服务等待由 Cordis `inject` 完成，slot 声明等待由 `ctx.slots.inject()` 完成。
 
@@ -283,11 +283,11 @@ P0 和 P1 共同构成第一轮可发布目标；仅修正显示问题不能算�
 
 ## 10. 开发验证约束
 
-修改 Breakpeek 代码或文档后，可以直接执行 UI 验证，无需事先询问用户。这里的 UI 验证仅指在已有可运行界面上进行人工交互和视觉检查；若需要先执行构建、启动自动化 GUI 测试或调用其他受限验证命令，仍按下述规则处理。
+修改 Breakpeek 代码或文档后，可以直接执行 UI 验证，无需事先询问用户。这里的 UI 验证仅指在已有可运行界面上进行人工交互和视觉检查；开发环境中已经由用户启动的 `pnpm dev` watcher 自动重建 Client bundle 不视为实施者另行执行验证命令。若需要由实施者启动 watcher、执行构建、启动自动化 GUI 测试或调用其他受限验证命令，仍按下述规则处理。
 
 自动化测试、客户端测试、构建、文档检查、GUI 测试及其他验证命令不得自动执行。实施者必须先列出建议运行的命令并询问用户，获得明确同意后方可执行。
 
-Breakpeek 的 Host 与浏览器运行时分别加载 `lib/index.js` 和 `lib/client.js`。修改影响运行行为的源码后，实施者必须提示用户重新生成包级构建产物，列出建议命令（通常为项目根目录下的 `pnpm build`），并在执行前取得用户同意。构建完成前，UI 中仍可能运行旧产物，不得将该 UI 结果作为当前源码已经生效的证据。
+Breakpeek 的 Host 与浏览器运行时分别加载 `lib/index.js` 和 `lib/client.js`。生产验证或修改 Host／Profile 内容后，实施者必须提示用户重新生成包级构建产物，列出建议命令（通常为项目根目录下的 `pnpm build`），并在执行前取得用户同意。开发环境可由用户运行 `pnpm dev`：它先生成本包 TypeScript 产物，再持续重建 Client bundle；Harness Web Profile 已挂载的 `@deepseek-ai/dsh-client-hmr` 检测 `lib/client.js` 变化并替换浏览器插件 Fiber。该链路不热替换 Host 入口或 Profile 配置，也不保留组件本地 React 状态。没有成功构建或 watcher 重建证据时，不得将 UI 结果作为当前源码已经生效的证据。
 
 Breakpeek 自行维护 `tsconfig.json` 和 `build/client-bundle.ts`。包级 `build` 命令必须在全新产物目录中完成 TypeScript 编译、Host 入口生成、CSS Modules 内联及 lazy-CJS Client 包装，不得隐式引用 DeepSeek Harness 仓库内的构建脚本。发布前必须保留 Profile 集成验证。
 

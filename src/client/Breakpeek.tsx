@@ -88,39 +88,43 @@ export function Breakpeek(props: BreakpeekProps) {
   const tip = BREAKPEEK_TIPS[wrapIndex(index)] ?? BREAKPEEK_TIPS[0]
   return createPortal(
     <div className={css.widget} role="status" aria-live="polite">
-      <span className={css.face}>{tip.face}</span>
-      <span className={css.text}>{tip.text}</span>
-      <span className={css.navigation}>
+      <div className={css.header}>
+        <div className={css.navigation}>
+          <button
+            className={css.navigationButton}
+            type="button"
+            aria-label="上一条讯息"
+            onClick={() => { setIndex(current => wrapIndex(current - 1)) }}
+          >
+            ←
+          </button>
+          <button
+            className={css.navigationButton}
+            type="button"
+            aria-label="下一条讯息"
+            onClick={() => { setIndex(current => wrapIndex(current + 1)) }}
+          >
+            →
+          </button>
+        </div>
         <button
-          className={css.navigationButton}
+          className={css.close}
           type="button"
-          aria-label="上一条讯息"
-          onClick={() => { setIndex(current => wrapIndex(current - 1)) }}
+          aria-label="关闭 Breakpeek 轻讯息"
+          onClick={() => {
+            setDismissed(true)
+            void props.setVisible(false).then((accepted) => {
+              if (!accepted) setDismissed(false)
+            })
+          }}
         >
-          ←
+          ×
         </button>
-        <button
-          className={css.navigationButton}
-          type="button"
-          aria-label="下一条讯息"
-          onClick={() => { setIndex(current => wrapIndex(current + 1)) }}
-        >
-          →
-        </button>
-      </span>
-      <button
-        className={css.close}
-        type="button"
-        aria-label="关闭 Breakpeek 轻讯息"
-        onClick={() => {
-          setDismissed(true)
-          void props.setVisible(false).then((accepted) => {
-            if (!accepted) setDismissed(false)
-          })
-        }}
-      >
-        ×
-      </button>
+      </div>
+      <div className={css.content}>
+        <span className={css.face}>{tip.face}</span>
+        <span className={css.text}>{tip.text}</span>
+      </div>
     </div>,
     host,
   )

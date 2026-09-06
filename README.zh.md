@@ -35,7 +35,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm build` 会将 `src/` 编译到 `lib/types/`，生成 `lib/index.js` 和 `lib/invariant.js` 两个 Host 入口，并将 `lib/client.js` 包装为延迟执行的模块加载器 factory。Harness 实际执行 `lib/` 下的文件；只修改 `src/` 不会更新正在运行的插件，因此必须先重新构建，再依据 Web UI 判断行为。
+`pnpm build` 会将 `src/` 编译到 `lib/types/`，生成 `lib/index.js` 和 `lib/invariant.js` 两个 Host 入口，并将 `lib/client.js` 包装为延迟执行的模块加载器 factory。Harness 实际执行 `lib/` 下的文件；生产验证仍需先重新构建，再依据 Web UI 判断行为。
 
 单元测试将已发布的延迟 Client Runtime bundle 映射到项目内的 store fixture。该方式复现 Harness monorepo 的源码 alias，避免 Vitest 直接执行依赖浏览器 ModuleLoader 的包装产物。
 
@@ -61,7 +61,16 @@ pnpm dsh web --dump-config | rg -n "ui-breakpeek|dsh-client-ui-breakpeek"
 pnpm dsh web
 ```
 
-后续修改源码时不需要重新建立链接。在 Breakpeek 中再次运行 `pnpm build`；Host 代码或配置发生变化后重启 `pnpm dsh web`，然后刷新浏览器。只修改浏览器代码也必须重新生成 `lib/client.js`；默认采用重启服务的方式，可以同时重新加载 Host 与浏览器两部分。
+后续修改源码时不需要重新建立链接。Harness Web bundle 已经挂载 `@deepseek-ai/dsh-client-hmr`；开发时在另一个终端启动 Breakpeek 自己的 bundle watcher：
+
+```sh
+cd /Users/runner/coding/breakpeek
+pnpm dev
+```
+
+`pnpm dev` 会先生成本包所需的 TypeScript 产物，再由 `tsdown --watch` 持续监听 `src/client/`、CSS Modules 及其导入依赖，并重写 `lib/client.js`。运行中的 Harness 会轮询该 bundle，通过 `/plugins/events` SSE 通知浏览器依次卸载旧 Fiber、移除旧样式并挂载新版本，无需刷新页面。热替换会重建组件，组件本地 React 状态不会保留。
+
+这个开发链路只热替换浏览器插件。修改 `src/index.ts`、`src/invariant.ts`、`cordis.patch.yml`、`package.json` 或其他 Host／Profile 内容后，先停止 watcher，运行 `pnpm build`，再重启 `pnpm dsh web`。不要让 `pnpm dev` 与 `pnpm build` 并发写入同一个 `lib/` 目录。若保存浏览器源码后没有更新，应同时确认 Breakpeek watcher 仍在输出重建日志，并确认当前页面由同一个启用了 `dsh-client-hmr` 的 Web Profile 进程提供。
 
 如需从 Profile 移除本地插件，执行：
 

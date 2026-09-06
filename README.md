@@ -35,7 +35,7 @@ pnpm test
 pnpm build
 ```
 
-`pnpm build` compiles `src/` into `lib/types/`, emits the Host entries at `lib/index.js` and `lib/invariant.js`, and wraps `lib/client.js` as a lazy module-loader factory. Harness executes files under `lib/`; editing `src/` alone does not update the running plugin. Rebuild before judging behavior in the Web UI.
+`pnpm build` compiles `src/` into `lib/types/`, emits the Host entries at `lib/index.js` and `lib/invariant.js`, and wraps `lib/client.js` as a lazy module-loader factory. Harness executes files under `lib/`; production validation still requires a rebuild before judging behavior in the Web UI.
 
 Unit tests alias the published lazy Client Runtime bundle to a package-local store fixture. This mirrors the source alias used by the Harness monorepo without loading the browser ModuleLoader wrapper in Vitest.
 
@@ -61,7 +61,16 @@ pnpm dsh web --dump-config | rg -n "ui-breakpeek|dsh-client-ui-breakpeek"
 pnpm dsh web
 ```
 
-After later source changes, the existing link remains valid. Run `pnpm build` again in Breakpeek, restart `pnpm dsh web` when Host code or configuration changed, and refresh the browser. A browser-only change also requires a rebuilt `lib/client.js`; restarting the server is the reliable default because it reloads both halves.
+After later source changes, the existing link remains valid. The Harness Web bundle already mounts `@deepseek-ai/dsh-client-hmr`; during development, start Breakpeek's own bundle watcher in another terminal:
+
+```sh
+cd /Users/runner/coding/breakpeek
+pnpm dev
+```
+
+`pnpm dev` first emits the TypeScript artifacts needed by this package, then `tsdown --watch` watches `src/client/`, CSS Modules, and their imported dependencies and rewrites `lib/client.js`. The running Harness process polls that bundle and uses `/plugins/events` SSE to tell the browser to unload the old fiber, remove its owned styles, and mount the rebuilt plugin without a page refresh. A hot swap creates a fresh component, so component-local React state is not preserved.
+
+This development path hot-swaps only the browser plugin. After changing `src/index.ts`, `src/invariant.ts`, `cordis.patch.yml`, `package.json`, or other Host/Profile inputs, stop the watcher, run `pnpm build`, and restart `pnpm dsh web`. Do not run `pnpm dev` and `pnpm build` concurrently because both write the same `lib/` directory. If a browser source edit does not appear, confirm both that the Breakpeek watcher is still reporting rebuilds and that the current page is served by the same Web Profile process with `dsh-client-hmr` enabled.
 
 Remove the local plugin from the profile with:
 
