@@ -1,0 +1,96 @@
+# @deepseek-ai/dsh-client-ui-breakpeek
+
+[English](README.md) | 中文
+
+Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。它展示本地面试题、笑话和技术提示，无需网络请求或凭据。[SPEC](SPEC.md) 定义拟实现的原位阅读器、内容来源和迭代计划。
+
+浏览器插件将 `breakpeek` 注册到 session scope 的 `conversation.input.overlay` slot，通过 Portal 将内容渲染到框架的 `[data-shell-overlay]` 层。它还向**设置 → 插件 → 插件配置**贡献一张 **Breakpeek** 卡片。Node 入口校验 Cordis 配置，注册 `ui-breakpeek` Host settings 命名空间，并将解析后的设置写入浏览器启动文档。
+
+浮窗不检查会话活动，也不等待静默阈值。`visible` 是持久化的打开状态；关闭按钮写入 `visible: false`，用户可从可视化设置卡片重新打开。前后按钮始终可以切换本地讯息。`autoRotate` 控制是否按 `rotationIntervalMs` 自动切换，默认间隔为 7000ms。
+
+```yaml
+- name: '@deepseek-ai/dsh-client-ui-breakpeek'
+  config:
+    visible: true
+    autoRotate: true
+    rotationIntervalMs: 7000
+```
+
+可视化的**显示讯息框**、**自动轮转讯息**和**轮转间隔**字段编辑同一组设置。Cordis 配置值是部署默认层；保存后的可视化选择成为 Host 设置文档中的用户覆盖层，在当前页面生效，并在刷新后保留。点击**恢复部署默认值**会删除三个字段的覆盖。
+
+## 开发与验证流程
+
+Breakpeek 自行维护 TypeScript、测试和 tsdown 配置，不引用 DeepSeek Harness 仓库内的构建文件。首次开发时在本项目目录安装依赖：
+
+```sh
+cd /Users/runner/coding/breakpeek
+pnpm install
+```
+
+修改 `src/` 下的代码后，按以下顺序执行包级检查：
+
+```sh
+pnpm typecheck
+pnpm test
+pnpm build
+```
+
+`pnpm build` 会将 `src/` 编译到 `lib/types/`，生成 `lib/index.js` 和 `lib/invariant.js` 两个 Host 入口，并将 `lib/client.js` 包装为延迟执行的模块加载器 factory。Harness 实际执行 `lib/` 下的文件；只修改 `src/` 不会更新正在运行的插件，因此必须先重新构建，再依据 Web UI 判断行为。
+
+单元测试将已发布的延迟 Client Runtime bundle 映射到项目内的 store fixture。该方式复现 Harness monorepo 的源码 alias，避免 Vitest 直接执行依赖浏览器 ModuleLoader 的包装产物。
+
+### 将本地项目链接到 DSH Profile
+
+先构建 Breakpeek，再从同级 DeepSeek Harness 项目目录执行 Profile 插件命令：
+
+```sh
+cd /Users/runner/coding/breakpeek
+pnpm build
+
+cd /Users/runner/coding/deepseek-harness
+pnpm dsh plugin --profile web add link:../breakpeek
+```
+
+该命令把文件系统链接写入 `web` Profile，不会把 Breakpeek 重新加入 Harness workspace。Profile 位于 `$DSH_HOME/profiles/web`；没有设置 `DSH_HOME` 时，默认位置是 `~/.dsh/profiles/web`。Breakpeek 声明了 `dsh.bundle`，因此命令还会把本包加入 Profile 的 bundle 列表，并应用 `cordis.patch.yml`。
+
+启动 UI 前先检查最终组合配置：
+
+```sh
+cd /Users/runner/coding/deepseek-harness
+pnpm dsh web --dump-config | rg -n "ui-breakpeek|dsh-client-ui-breakpeek"
+pnpm dsh web
+```
+
+后续修改源码时不需要重新建立链接。在 Breakpeek 中再次运行 `pnpm build`；Host 代码或配置发生变化后重启 `pnpm dsh web`，然后刷新浏览器。只修改浏览器代码也必须重新生成 `lib/client.js`；默认采用重启服务的方式，可以同时重新加载 Host 与浏览器两部分。
+
+如需从 Profile 移除本地插件，执行：
+
+```sh
+cd /Users/runner/coding/deepseek-harness
+pnpm dsh plugin --profile web remove @deepseek-ai/dsh-client-ui-breakpeek
+```
+
+包级检查证明编译和组件行为，配置 dump 证明 Profile 已完成组合。最终集成验证仍需打开真实 Harness Web UI，检查浮窗以及**设置 → 插件 → 插件配置**中的 Breakpeek 卡片。
+
+按照 [SPEC.md](SPEC.md) 的项目约束，可以直接进行 UI 人工检查。构建、自动化测试、Client 测试、文档检查和 GUI 测试需要先取得用户同意，除非当前任务已经明确授权。修改运行时代码后，必须提醒用户先执行 `pnpm build`，否则 UI 结果不能代表最新源码。
+
+## Model Experience
+
+### 本地展示
+
+#### What the model sees
+
+无。插件渲染 `BREAKPEEK_TIPS` 中的本地文本，不向模型请求添加消息、工具或提示词段落。
+
+#### Token effect
+
+零。展示和轮换本地内容不发送模型请求。
+
+#### KV Cache effect
+
+无。插件不改变模型请求内容，不会使可复用的请求前缀失效。
+
+## Known Limitations and Deferred Work
+
+- **仅摘要内容：** 原位详情和远程来源属于 SPEC 中的提案，尚未实现。
+- **浮层依赖：** 组件通过 DOM 属性寻找容器；容器缺失时不渲染。

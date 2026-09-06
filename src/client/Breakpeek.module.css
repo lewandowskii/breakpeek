@@ -1,0 +1,87 @@
+.widget {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 21;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 340px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--dsw-bg-elevated, #1f2430);
+  color: var(--dsw-fg, #e6e9f0);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  animation: widget-pop 0.18s ease-out;
+}
+
+@keyframes widget-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.face {
+  font-size: 20px;
+  line-height: 1;
+  flex: none;
+}
+
+.text {
+  min-width: 0;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.navigation {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.navigationButton,
+.close {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.navigationButton {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 15px;
+}
+
+.close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  margin-left: 2px;
+}
+
+.navigationButton:hover,
+.close:hover {
+  opacity: 1;
+}
+
+.navigationButton:focus-visible,
+.close:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+  opacity: 1;
+}
