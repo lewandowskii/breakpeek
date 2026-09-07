@@ -5,3 +5,12 @@
         visible: true
         autoRotate: true
         rotationIntervalMs: 7000
+        contentSources:
+          - light-jokes
+          - interview-general
+          - interview-frontend
+          - interview-backend
+          - tech-trends
+          - interview-ai
+          - life-knowledge
+          - coding-tips

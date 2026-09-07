@@ -28,6 +28,7 @@
 
 .header:focus-visible,
 .switch:focus-visible,
+.sourceCheckbox:focus-visible,
 .numberInput:focus-visible,
 .reset:focus-visible,
 .discard:focus-visible,
@@ -60,8 +61,8 @@
 }
 
 .chevron {
+  flex: none;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 20px;
   transition: transform .16s;
 }
 
@@ -96,6 +97,56 @@
 
 .field + .field {
   border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.sourceField {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sourceOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sourceOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.sourceOptionSelected {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-primary);
+}
+
+.sourceOption:has(.sourceCheckbox:disabled) {
+  cursor: default;
+  opacity: .65;
+}
+
+.sourceCheckbox {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: inherit;
 }
 
 .fieldHead {

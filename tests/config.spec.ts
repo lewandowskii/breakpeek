@@ -6,7 +6,8 @@ import {
 } from '@deepseek-ai/dsh-settings'
 import * as BreakpeekPlugin from '../src/index.ts'
 import {
-  BREAKPEEK_CONFIG_GLOBAL, BREAKPEEK_SETTINGS_NAMESPACE, parseBootConfig,
+  BREAKPEEK_CONFIG_GLOBAL, BREAKPEEK_CONTENT_SOURCES,
+  BREAKPEEK_SETTINGS_NAMESPACE, parseBootConfig,
 } from '../src/boot-config.ts'
 
 class MemorySettings extends SettingsProvider {
@@ -36,7 +37,12 @@ describe('ui-breakpeek configuration', () => {
     expect(collect(ctx)).toContainEqual({
       kind: 'global',
       name: BREAKPEEK_CONFIG_GLOBAL,
-      value: { visible: false, autoRotate: false, rotationIntervalMs: 12_000 },
+      value: {
+        visible: false,
+        autoRotate: false,
+        rotationIntervalMs: 12_000,
+        contentSources: [...BREAKPEEK_CONTENT_SOURCES],
+      },
     })
   })
 
@@ -45,6 +51,7 @@ describe('ui-breakpeek configuration', () => {
       visible: true,
       autoRotate: true,
       rotationIntervalMs: 7000,
+      contentSources: [...BREAKPEEK_CONTENT_SOURCES],
     })
     expect(() => parseBootConfig({
       visible: true,
@@ -55,6 +62,31 @@ describe('ui-breakpeek configuration', () => {
     )
   })
 
+  it('accepts old bootstrap data and validates configured message sources', () => {
+    expect(parseBootConfig({
+      visible: true,
+      autoRotate: false,
+      rotationIntervalMs: 7000,
+    })).toEqual({
+      visible: true,
+      autoRotate: false,
+      rotationIntervalMs: 7000,
+      contentSources: [...BREAKPEEK_CONTENT_SOURCES],
+    })
+    expect(() => parseBootConfig({
+      visible: true,
+      autoRotate: true,
+      rotationIntervalMs: 7000,
+      contentSources: [],
+    })).toThrow(`globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
+    expect(() => parseBootConfig({
+      visible: true,
+      autoRotate: true,
+      rotationIntervalMs: 7000,
+      contentSources: ['not-a-library'],
+    })).toThrow(`globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
+  })
+
   it('registers a visual setting whose user value overrides the Cordis default', async () => {
     const ctx = new Context()
     await ctx.plugin(MemorySettings).await()
@@ -62,6 +94,7 @@ describe('ui-breakpeek configuration', () => {
       visible: true,
       autoRotate: true,
       rotationIntervalMs: 7000,
+      contentSources: [...BREAKPEEK_CONTENT_SOURCES],
     }).await()
     const ns = settingsNamespace(BREAKPEEK_SETTINGS_NAMESPACE)
 
@@ -69,16 +102,23 @@ describe('ui-breakpeek configuration', () => {
       visible: true,
       autoRotate: true,
       rotationIntervalMs: 7000,
+      contentSources: [...BREAKPEEK_CONTENT_SOURCES],
     })
     await ctx.settings.update(ns, {
       visible: false,
       autoRotate: false,
       rotationIntervalMs: 12_000,
+      contentSources: ['interview-ai'],
     })
     expect(collect(ctx)).toContainEqual({
       kind: 'global',
       name: BREAKPEEK_CONFIG_GLOBAL,
-      value: { visible: false, autoRotate: false, rotationIntervalMs: 12_000 },
+      value: {
+        visible: false,
+        autoRotate: false,
+        rotationIntervalMs: 12_000,
+        contentSources: ['interview-ai'],
+      },
     })
   })
 })

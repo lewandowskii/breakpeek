@@ -17,19 +17,19 @@
 
 现有设计是在 Harness 页面中持续展示不依赖网络的短内容。它是页面内的 React 浮窗，通过 Cordis 插件安装，不是操作系统桌面窗口，也不具备浏览器关闭后的后台通知能力。
 
-当前 [Breakpeek](src/client/Breakpeek.tsx) 不读取会话状态或静默时间。`visible` 直接表示浮窗的打开状态；浮窗关闭按钮与统一插件设置页读写同一字段。`autoRotate` 和 `rotationIntervalMs` 控制定时切换，前后箭头允许用户随时手动切换。当前版本没有详情、远程内容源或发送接口。
+当前 [Breakpeek](src/client/Breakpeek.tsx) 不读取会话状态或静默时间。`visible` 直接表示浮窗的打开状态；浮窗关闭按钮与统一插件设置页读写同一字段。`autoRotate` 和 `rotationIntervalMs` 控制定时切换，`contentSources` 筛选手动与自动轮转的本地资料库。可展开讯息提供原位详情；当前版本没有远程内容源或发送接口。
 
 ### 1.2 代码框架与职责
 
 | 文件或入口 | 已有职责 | 后续处理方向 |
 |---|---|---|
 | [package.json](package.json) | 声明 Node、`./client`、`./invariant` 出口，以及 `dsh.client.platform = web` | 保留双入口插件结构，按新依赖调整声明 |
-| [src/config.ts](src/config.ts)、[src/boot-config.ts](src/boot-config.ts) | 声明 `visible`、`autoRotate`、`rotationIntervalMs` Cordis schema、默认值与浏览器启动配置解析 | 随后续内容设置扩展 schema |
+| [src/config.ts](src/config.ts)、[src/boot-config.ts](src/boot-config.ts) | 声明 `visible`、`autoRotate`、`rotationIntervalMs`、`contentSources` Cordis schema、默认值与浏览器启动配置解析 | 随后续内容源扩展 schema |
 | [src/index.ts](src/index.ts) 的 `apply()` | 注册 `ui-breakpeek` settings namespace，以 Cordis 配置为默认层，并将解析值贡献为浏览器启动数据 | 随后续设置字段扩展 schema |
 | [src/client/index.ts](src/client/index.ts) 的 `apply(ctx)` | 读取启动配置、绑定实时 settings scope，并注册浮窗及插件配置卡片 | 后续改为 root 浮窗注册，消除会话 slot 依赖 |
 | [Breakpeek.tsx](src/client/Breakpeek.tsx) | 按显示和轮转设置管理内容索引、前后切换及关闭，并通过 Portal 渲染 | 拆出共享状态和阅读组件 |
-| [BreakpeekSettingsCard.tsx](src/client/BreakpeekSettingsCard.tsx)、[settings-controller.ts](src/client/settings-controller.ts) | 在统一插件配置页中展示、暂存、保存及重置显示和轮转设置 | 随后续内容设置扩展控件 |
-| [breakpeek-tips.ts](src/client/breakpeek-tips.ts) | 8 条中文静态内容，仅有 `face` 和 `text` | 建立有稳定 ID、摘要和正文的内容模型 |
+| [BreakpeekSettingsCard.tsx](src/client/BreakpeekSettingsCard.tsx)、[settings-controller.ts](src/client/settings-controller.ts) | 在统一插件配置页中展示、暂存、保存及重置显示、轮转和资料库多选设置 | 随后续内容源扩展控件 |
+| [breakpeek-tips.ts](src/client/breakpeek-tips.ts) | 本地讯息对象含 `index`、`preview`、可选 `detail` 和资料库 `type` | 后续将资料库从单文件拆分为可注册内容源 |
 | [Breakpeek.module.css](src/client/Breakpeek.module.css) | 右下角定位、布局、外观与入场动画 | 转为摘要／详情两种布局及完整主题 token |
 | [src/invariant.ts](src/invariant.ts) | 注册空 invariant installer，理由是没有跨插件可变数据 | 实施后重新判断是否存在需要验证的数据关系 |
 | [组件测试](tests/breakpeek.client.spec.tsx) | 描述显示开关、手动前后切换、定时轮转及点击关闭 | 补充注册释放与真实组装验证 |
@@ -47,15 +47,15 @@ Web profile / bundle 挂载插件
   → settingsScope.bind('ui-breakpeek') 订阅实时用户设置
   → slots.inject('conversation.input.overlay')
   → slots.register(..., Breakpeek)
-  → 读取 visible / autoRotate / rotationIntervalMs
-  → 组件内部索引与轮转计时器
+  → 读取 visible / autoRotate / rotationIntervalMs / contentSources
+  → 按资料库筛选内容，并管理索引与轮转计时器
   → createPortal(..., document.querySelector('[data-shell-overlay]'))
   → AppFrame 的页面浮层
 
 Client apply(ctx)
   → slots.inject('settings.plugin.item')
   → 在“插件配置”标签页注册 Breakpeek 卡片
-  → 用户暂存并保存显示和轮转设置
+  → 用户暂存并保存显示、轮转和资料库多选设置
   → Host settings 文档更新
   → settings scope 发布新快照
   → 当前浮窗立即采用新模式
@@ -68,19 +68,21 @@ Client apply(ctx)
 | 项目 | 代码中的机制 | 局限 |
 |---|---|---|
 | 展示状态 | `visible` 默认为 `true`；关闭按钮写入 `false` | Cordis 值是部署默认层；可视化设置保存后作为用户覆盖层即时生效 |
-| 自动轮转 | `autoRotate` 默认为 `true`；仅在浮窗可见时创建计时器 | 关闭自动轮转不影响手动切换 |
+| 自动轮转 | `autoRotate` 默认为 `true`；仅在浮窗可见且详情未展开时创建计时器 | 收起详情后从完整间隔重新计时；关闭自动轮转不影响手动切换 |
 | 轮转间隔 | `rotationIntervalMs` 默认为 7000ms，允许 1000–3600000ms | 浏览器启动数据与设置 schema 同时验证范围 |
-| 手动切换 | 前后箭头递增或递减索引，并在内容数组两端循环 | 尚无已读、去重和详情阅读锁定 |
+| 轮转资料库 | `contentSources` 默认启用全部内置来源，可视化设置为多选 | 至少保留一项；来源变更后收起详情并从新内容池首条开始 |
+| 手动切换 | 前后箭头递增或递减索引，并在内容数组两端循环 | 切换时退出详情态；尚无已读和去重 |
 | 手动关闭 | 立即隐藏，并通过 settings scope 持久化 `visible: false` | 写入失败时恢复显示，避免界面状态与已确认配置长期不一致 |
-| 位置与大小 | 绝对定位，距右／下 24px，最大宽度 340px | 尚无展开尺寸、窄屏和遮挡规则 |
-| 动画与外观 | 180ms 淡入、向上位移 6px；emoji 和中文文本 | 存在硬编码颜色及阴影，未覆盖减少动态效果偏好 |
-| 可访问性 | 容器使用 `role="status"`、`aria-live="polite"`；关闭按钮有名称 | 缺少详情按钮、展开语义及焦点管理 |
+| 位置与大小 | 初始距右／下 24px，操作区中间的无标记拖拽区域或方向键可移动；位置被约束在视口 8px 内边距内 | 详情正文独立滚动并在底部渐隐；尚无宿主输入区碰撞检测与位置持久化 |
+| 展开方向 | 详情默认定位在摘要上方；上边缘将越出视口时自动切换到下方 | 拖拽和视口尺寸变化后继续约束摘要与详情的组合边界 |
+| 动画与外观 | 180ms 淡入、向上位移 6px；emoji 和中文文本 | `prefers-reduced-motion` 下取消入场动画；阴影仍使用本地回退值 |
+| 可访问性 | 摘要变化使用 `role="status"`、`aria-live="polite"`；展开按钮提供 `aria-expanded` / `aria-controls`，Esc 可收起 | 尚未实现二次 Esc 关闭和触发点焦点归还 |
 
-组件计时器有 `clearInterval` 清理；插件不调用 Remote、不读写业务 store、不修改会话日志、不请求模型。当前本地内容不增加模型 token 或 KV Cache 成本。
+组件计时器有 `clearTimeout` 清理；插件不调用 Remote、不读写业务 store、不修改会话日志、不请求模型。当前本地内容不增加模型 token 或 KV Cache 成本。
 
 ### 1.5 验证基线
 
-组件测试使用假时钟和可访问角色描述显示开关、前后切换、配置频率轮转及点击关闭。完整验证结果以当前变更实际运行的检查为准。
+组件测试使用假时钟和可访问角色覆盖讯息对象顺序、显示开关、拖拽边界、详情展开方向与语义、阅读期暂停与收起后恢复轮转、前后切换及点击关闭。完整验证结果以当前变更实际运行的检查为准。
 
 `invariant.ts` 的注释提及 HMR 释放验证，但所读取的测试文件中没有插件 fiber 卸载测试；现有证据包含组件与配置测试代码。本次已修改运行代码；按照本文第 10 节约束，获得用户许可前不执行自动化测试、构建、文档检查或真实浏览器验收。
 
@@ -114,7 +116,7 @@ Breakpeek 是嵌入 Harness Web 界面的轻讯息投递与阅读插件。它在
 | F06 | 设置页提供“立即查看一条”和“预览” | 关闭后仍能主动打开；预览不消费队列、不标记已读 |
 | F07 | 提供上一条和下一条，支持收起后继续阅读当前条目 | 用户主动切换才退出阅读锁定；候选为空时明确反馈 |
 | F08 | 关闭插件展示开关后，浮窗及调度停止，设置页仍可打开 | 可从设置重新启用；Loader 卸载插件则连设置贡献一起释放 |
-| F09 | Cordis 与可视化配置提供显示开关、自动轮转开关和轮转间隔 | 三个字段在当前页面即时生效，并按宿主能力持久化 |
+| F09 | Cordis 与可视化配置提供显示开关、自动轮转开关、轮转间隔和讯息来源多选 | 四个字段在当前页面即时生效，并按宿主能力持久化 |
 
 首期布局建议值：摘要宽度上限约 340px；详情宽度上限约 520px、高度上限为可视区域的 70%。窄屏宽度不得超过可用视口减去边距，避开输入区、移动端键盘和安全区。以上为待视觉验收的初始参数，不是现有实现承诺。
 
@@ -141,19 +143,18 @@ Breakpeek 是嵌入 Harness Web 界面的轻讯息投递与阅读插件。它在
 
 ## 4. 插件设置
 
-当前已实现 Cordis 插件配置 `visible`、`autoRotate` 和 `rotationIntervalMs`，并在统一的**设置 → 插件 → 插件配置**标签页中注册 Breakpeek 卡片。Node 入口以 Cordis 值注册 `ui-breakpeek` settings namespace 的默认层；用户在卡片中保存的选择写入 Host 设置文档的用户层，并通过 client settings scope 在当前页面即时生效。卡片中的“恢复部署默认值”删除三个字段的用户层值，使配置重新继承 Cordis 值。插件安装／卸载仍归宿主插件管理。
+当前已实现 Cordis 插件配置 `visible`、`autoRotate`、`rotationIntervalMs` 和 `contentSources`，并在统一的**设置 → 插件 → 插件配置**标签页中注册 Breakpeek 卡片。Node 入口以 Cordis 值注册 `ui-breakpeek` settings namespace 的默认层；用户在卡片中保存的选择写入 Host 设置文档的用户层，并通过 client settings scope 在当前页面即时生效。卡片中的“恢复部署默认值”删除四个字段的用户层值，使配置重新继承 Cordis 值。插件安装／卸载仍归宿主插件管理。
 
 | Cordis 配置项 | 默认值 | 当前规则 |
 |---|---|---|
 | `visible` | `true` | 表示当前浮窗打开状态；关闭按钮与可视化开关写同一字段 |
 | `autoRotate` | `true` | 打开时按间隔自动显示下一条；关闭后保留手动前后切换 |
 | `rotationIntervalMs` | `7000` | 自动轮转间隔，范围为 1000–3600000ms；可视化卡片以秒为单位编辑 |
+| `contentSources` | 全部内置资料库 | 可多选轻笑话、通用／前端／后端／AI 面试题、技术风向、生活常识和编程技巧；至少保留一项 |
 
 | 配置项 | 首期建议 | 规则 |
 |---|---|---|
-| `categories` | 面试题、技术提示、演示新闻 | 可多选；全部不选时展示空状态，不静默换成其他类别 |
-| `sourceIds` | 内置内容源 | 仅允许选择已注册且可用的来源 |
-| `position` | 右下 | 首期固定右下；后续可选左右下角，受视口约束 |
+| `position` | 右下 | 当前默认右下且支持视口内拖拽；位置持久化后续实现 |
 | `pauseOnInteraction` | 后续默认开启 | 展开、悬停或键盘聚焦时暂停自动轮转 |
 
 这里的默认值和范围是待实现的产品方案。时长、筛选及布局选择必须进入明确的设置 schema 或部署 Config，不能只用模块常量充当配置；对定时器内部精度等实现参数，仅在确有部署调整需要时公开。
@@ -234,7 +235,7 @@ tests/
 
 ### 6.3 设置和模块接入
 
-当前 Node 入口使用 `Config` schema 校验 `visible`、`autoRotate` 和 `rotationIntervalMs`，将 Cordis 配置作为 `ui-breakpeek` settings namespace 的默认层，并在每次 `webserver/index-inject` 收集时贡献当前解析值 `__DSH_BREAKPEEK_CONFIG__`。浏览器入口把启动数据视为 wire 输入，验证字段类型与间隔范围后作为 settings 首次加载前的回退值；启动数据缺失时采用默认配置，格式错误时明确失败。settings scope 就绪后成为当前页面的值来源，因此可视化保存无需刷新即可改变显示与轮转行为。
+当前 Node 入口使用 `Config` schema 校验 `visible`、`autoRotate`、`rotationIntervalMs` 和非空 `contentSources`，将 Cordis 配置作为 `ui-breakpeek` settings namespace 的默认层，并在每次 `webserver/index-inject` 收集时贡献当前解析值 `__DSH_BREAKPEEK_CONFIG__`。浏览器入口把启动数据视为 wire 输入，验证字段类型、间隔范围和资料库 ID 后作为 settings 首次加载前的回退值；旧版启动数据未含资料库字段时默认启用全部来源。settings scope 就绪后成为当前页面的值来源，因此可视化保存无需刷新即可改变显示与轮转内容。
 
 浏览器在 `apply` 内分别绑定浮窗和配置卡片使用的 settings scope，避免跨 root/session scope 复用同一个 handle。卡片通过 Harness `ui-settings-plugins` 声明的 `settings.plugin.item` 扩展点进入统一插件配置标签页，并自行拥有控件、暂存、带 revision 的并发写入保护、失败反馈和双语文案，不依赖 DOM 查找私有设置结构，也不另造 localStorage 配置源。
 

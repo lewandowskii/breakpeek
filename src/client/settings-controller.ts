@@ -4,11 +4,22 @@ import {
   createSnapshotStore, type SettingsScope, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  type BreakpeekSettings, type ResolvedConfig, resolveConfig,
+  type BreakpeekContentSource, type BreakpeekSettings, type ResolvedConfig, resolveConfig,
 } from '../boot-config.ts'
 
-const SETTINGS_FIELDS = ['visible', 'autoRotate', 'rotationIntervalMs'] as const
+const SETTINGS_FIELDS = ['visible', 'autoRotate', 'rotationIntervalMs', 'contentSources'] as const
 type SettingsField = typeof SETTINGS_FIELDS[number]
+
+/** Compare scalar settings and ordered source selections by value. */
+function settingEquals(
+  left: ResolvedConfig[SettingsField] | undefined,
+  right: ResolvedConfig[SettingsField] | undefined,
+): boolean {
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return left.length === right.length && left.every((value, index) => value === right[index])
+  }
+  return left === right
+}
 
 /** State rendered by the Breakpeek settings card. */
 export interface BreakpeekSettingsCardState extends ResolvedConfig {
@@ -38,6 +49,8 @@ export interface BreakpeekSettingsCardFace {
   editAutoRotate: (value: boolean) => void
   /** Stage the automatic rotation interval in milliseconds. */
   editRotationIntervalMs: (value: number) => void
+  /** Stage the local message libraries included in rotation. */
+  editContentSources: (value: BreakpeekContentSource[]) => void
   /** Stage removal of all Breakpeek user overrides. */
   reset: () => void
   /** Persist the staged values. */
@@ -94,7 +107,7 @@ export class BreakpeekSettingsController {
       dirty: this.resetPending
         ? SETTINGS_FIELDS.some(field => this.stored(field))
         : SETTINGS_FIELDS.some(field => Object.hasOwn(this.draft, field)
-          && this.draft[field] !== current[field]),
+          && !settingEquals(this.draft[field], current[field])),
       saving: this.saving,
       failed: this.failed,
     }
@@ -106,7 +119,7 @@ export class BreakpeekSettingsController {
 
   private edit<Field extends SettingsField>(field: Field, value: ResolvedConfig[Field]): void {
     const current = this.current()
-    if (value === current[field]) {
+    if (settingEquals(value, current[field])) {
       const next = { ...this.draft }
       delete next[field]
       this.draft = next
@@ -125,6 +138,7 @@ export class BreakpeekSettingsController {
       editVisible: value => { this.edit('visible', value) },
       editAutoRotate: value => { this.edit('autoRotate', value) },
       editRotationIntervalMs: value => { this.edit('rotationIntervalMs', value) },
+      editContentSources: value => { this.edit('contentSources', value) },
       reset: () => {
         this.draft = {}
         this.resetPending = true
@@ -159,7 +173,7 @@ export class BreakpeekSettingsController {
     const landed = reset
       ? SETTINGS_FIELDS.every(field => !this.stored(field))
       : SETTINGS_FIELDS.every(field => !Object.hasOwn(draft, field)
-        || (this.stored(field) && current[field] === draft[field]))
+        || (this.stored(field) && settingEquals(current[field], draft[field])))
     if (landed) {
       this.draft = {}
       this.resetPending = false

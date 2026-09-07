@@ -6,7 +6,7 @@ Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。它展示本地�
 
 浏览器插件将 `breakpeek` 注册到 session scope 的 `conversation.input.overlay` slot，通过 Portal 将内容渲染到框架的 `[data-shell-overlay]` 层。它还向**设置 → 插件 → 插件配置**贡献一张 **Breakpeek** 卡片。Node 入口校验 Cordis 配置，注册 `ui-breakpeek` Host settings 命名空间，并将解析后的设置写入浏览器启动文档。
 
-浮窗不检查会话活动，也不等待静默阈值。`visible` 是持久化的打开状态；关闭按钮写入 `visible: false`，用户可从可视化设置卡片重新打开。前后按钮始终可以切换本地讯息。`autoRotate` 控制是否按 `rotationIntervalMs` 自动切换，默认间隔为 7000ms。
+浮窗不检查会话活动，也不等待静默阈值。`visible` 是持久化的打开状态；关闭按钮写入 `visible: false`，用户可从可视化设置卡片重新打开。拖动操作区中间无标记的空白区域可调整浮窗位置，移动范围限制在当前可视页面内；该区域获得焦点后也可用方向键移动。含 `detail` 字段的讯息会显示展开箭头，并打开可独立滚动的详情。详情默认向上展开；如果顶部将超出可视范围，则自动改为向下展开。仅有预览的讯息保持普通文本。详情展开时暂停自动轮转，收起后从一个完整的 `rotationIntervalMs` 重新计时；前后按钮会先收起详情再立即切换。`contentSources` 决定手动与自动轮转使用哪些本地资料库。默认间隔为 7000ms，并默认启用全部资料库。
 
 ```yaml
 - name: '@deepseek-ai/dsh-client-ui-breakpeek'
@@ -14,9 +14,18 @@ Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。它展示本地�
     visible: true
     autoRotate: true
     rotationIntervalMs: 7000
+    contentSources:
+      - light-jokes
+      - interview-general
+      - interview-frontend
+      - interview-backend
+      - tech-trends
+      - interview-ai
+      - life-knowledge
+      - coding-tips
 ```
 
-可视化的**显示讯息框**、**自动轮转讯息**和**轮转间隔**字段编辑同一组设置。Cordis 配置值是部署默认层；保存后的可视化选择成为 Host 设置文档中的用户覆盖层，在当前页面生效，并在刷新后保留。点击**恢复部署默认值**会删除三个字段的覆盖。
+可视化的**显示讯息框**、**自动轮转讯息**、**轮转讯息来源**和**轮转间隔**字段编辑同一组设置。讯息来源是至少保留一项的多选配置。Cordis 配置值是部署默认层；保存后的可视化选择成为 Host 设置文档中的用户覆盖层，在当前页面生效，并在刷新后保留。点击**恢复部署默认值**会删除四个字段的覆盖。
 
 ## 开发与验证流程
 
@@ -101,5 +110,5 @@ pnpm dsh plugin --profile web remove @deepseek-ai/dsh-client-ui-breakpeek
 
 ## Known Limitations and Deferred Work
 
-- **仅摘要内容：** 原位详情和远程来源属于 SPEC 中的提案，尚未实现。
+- **仅本地内容：** 讯息对象已支持预览和可选原位详情，远程内容来源仍是 SPEC 中的后续项。
 - **浮层依赖：** 组件通过 DOM 属性寻找容器；容器缺失时不渲染。

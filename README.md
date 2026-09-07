@@ -6,7 +6,7 @@ Breakpeek is a persistent floating message widget for the Harness Web GUI. It di
 
 The browser plugin registers `breakpeek` into the session-scoped `conversation.input.overlay` slot and portals its content into the frame's `[data-shell-overlay]` layer. It also contributes a **Breakpeek** card to **Settings → Plugins → Plugin configuration**. The Node entry validates Cordis configuration, registers the `ui-breakpeek` Host settings namespace, and publishes the resolved settings in the browser boot document.
 
-The panel does not inspect conversation activity or wait for a silence threshold. `visible` is its persisted open state. The close button writes `visible: false`, and the visual settings card can open it again. The previous and next buttons always change the current local message. `autoRotate` optionally advances messages every `rotationIntervalMs`; the default interval is 7000ms.
+The panel does not inspect conversation activity or wait for a silence threshold. `visible` is its persisted open state. The close button writes `visible: false`, and the visual settings card can open it again. Drag the unmarked space in the header to reposition the panel; pointer movement is clamped to the visible viewport, and the focused drag area also accepts arrow keys. Messages with a `detail` field show an expand arrow and open an independently scrollable detail area. Details normally open above the panel, but switch below it when the upper edge would leave the viewport. Preview-only messages remain plain text. Expanded details pause automatic rotation. Collapsing restarts a complete `rotationIntervalMs`, while the previous and next buttons collapse any open detail and switch immediately. `contentSources` selects which local libraries participate in both manual and automatic rotation. The default interval is 7000ms and all libraries are enabled by default.
 
 ```yaml
 - name: '@deepseek-ai/dsh-client-ui-breakpeek'
@@ -14,9 +14,18 @@ The panel does not inspect conversation activity or wait for a silence threshold
     visible: true
     autoRotate: true
     rotationIntervalMs: 7000
+    contentSources:
+      - light-jokes
+      - interview-general
+      - interview-frontend
+      - interview-backend
+      - tech-trends
+      - interview-ai
+      - life-knowledge
+      - coding-tips
 ```
 
-The visual **Show message panel**, **Rotate messages automatically**, and **Rotation interval** fields edit the same settings. Cordis values are the deployment base; saved visual choices become user overrides in the Host settings document, take effect on the current page, and survive reloads. **Reset to deployment default** removes all three overrides.
+The visual **Show message panel**, **Rotate messages automatically**, **Message sources**, and **Rotation interval** fields edit the same settings. Message sources are a multi-select with at least one library retained. Cordis values are the deployment base; saved visual choices become user overrides in the Host settings document, take effect on the current page, and survive reloads. **Reset to deployment default** removes all four overrides.
 
 ## Development and validation
 
@@ -101,5 +110,5 @@ None. The plugin does not change model request content or invalidate a reusable 
 
 ## Known Limitations and Deferred Work
 
-- **Summary-only content:** inline details and remote sources are proposed in the SPEC and are not implemented.
+- **Local content only:** message objects support previews and optional inline details, but remote content sources are still deferred in the SPEC.
 - **Overlay dependency:** the component finds its host by DOM attribute; an absent host renders nothing.

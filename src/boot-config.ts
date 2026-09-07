@@ -11,6 +11,27 @@ export const MIN_ROTATION_INTERVAL_MS = 1000
 /** Largest supported automatic rotation interval. */
 export const MAX_ROTATION_INTERVAL_MS = 3_600_000
 
+/** Message libraries that can participate in local rotation. */
+export const BREAKPEEK_CONTENT_SOURCES = [
+  'light-jokes',
+  'interview-general',
+  'interview-frontend',
+  'interview-backend',
+  'tech-trends',
+  'interview-ai',
+  'life-knowledge',
+  'coding-tips',
+] as const
+
+/** Identifier for one selectable local message library. */
+export type BreakpeekContentSource = typeof BREAKPEEK_CONTENT_SOURCES[number]
+
+/** Whether a raw value names a supported local message library. */
+export function isBreakpeekContentSource(value: unknown): value is BreakpeekContentSource {
+  return typeof value === 'string'
+    && (BREAKPEEK_CONTENT_SOURCES as readonly string[]).includes(value)
+}
+
 /** User-editable Breakpeek settings shared with the browser. */
 export interface BreakpeekSettings {
   /** Whether the message panel is open. */
@@ -19,6 +40,8 @@ export interface BreakpeekSettings {
   autoRotate?: boolean
   /** Milliseconds between automatic message changes. */
   rotationIntervalMs?: number
+  /** Local message libraries included in manual and automatic rotation. */
+  contentSources?: BreakpeekContentSource[]
 }
 
 /** Resolved configuration consumed by the browser plugin. */
@@ -29,6 +52,8 @@ export interface ResolvedConfig {
   autoRotate: boolean
   /** Milliseconds between automatic message changes. */
   rotationIntervalMs: number
+  /** Local message libraries included in manual and automatic rotation. */
+  contentSources: BreakpeekContentSource[]
 }
 
 /** Defaults used by Cordis, browser bootstrap, and visual settings. */
@@ -36,14 +61,20 @@ export const DEFAULT_BREAKPEEK_CONFIG: Readonly<ResolvedConfig> = Object.freeze(
   visible: true,
   autoRotate: true,
   rotationIntervalMs: 7000,
+  contentSources: [...BREAKPEEK_CONTENT_SOURCES],
 })
 
 /** Resolve schema defaults for direct callers and Host bootstrap serialization. */
 export function resolveConfig(config: BreakpeekSettings = {}): ResolvedConfig {
+  const configuredSources = config.contentSources?.filter(isBreakpeekContentSource)
+  const contentSources = configuredSources !== undefined && configuredSources.length > 0
+    ? [...new Set(configuredSources)]
+    : [...BREAKPEEK_CONTENT_SOURCES]
   return {
     visible: config.visible ?? DEFAULT_BREAKPEEK_CONFIG.visible,
     autoRotate: config.autoRotate ?? DEFAULT_BREAKPEEK_CONFIG.autoRotate,
     rotationIntervalMs: config.rotationIntervalMs ?? DEFAULT_BREAKPEEK_CONFIG.rotationIntervalMs,
+    contentSources,
   }
 }
 
@@ -58,11 +89,17 @@ export function parseBootConfig(value: unknown): ResolvedConfig {
     throw new Error(`ui-breakpeek: globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
   }
   const config = value as Record<string, unknown>
+  const contentSourcesValid = config.contentSources === undefined
+    || (Array.isArray(config.contentSources)
+      && config.contentSources.length > 0
+      && config.contentSources.every(isBreakpeekContentSource)
+      && new Set(config.contentSources).size === config.contentSources.length)
   if (typeof config.visible !== 'boolean'
     || typeof config.autoRotate !== 'boolean'
     || !Number.isSafeInteger(config.rotationIntervalMs)
     || (config.rotationIntervalMs as number) < MIN_ROTATION_INTERVAL_MS
-    || (config.rotationIntervalMs as number) > MAX_ROTATION_INTERVAL_MS) {
+    || (config.rotationIntervalMs as number) > MAX_ROTATION_INTERVAL_MS
+    || !contentSourcesValid) {
     throw new Error(`ui-breakpeek: globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
   }
   return resolveConfig(config as BreakpeekSettings)

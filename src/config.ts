@@ -2,7 +2,8 @@
 
 import Schema from '@deepseek-ai/schemastery'
 import {
-  DEFAULT_BREAKPEEK_CONFIG, MAX_ROTATION_INTERVAL_MS, MIN_ROTATION_INTERVAL_MS,
+  BREAKPEEK_CONTENT_SOURCES, DEFAULT_BREAKPEEK_CONFIG,
+  MAX_ROTATION_INTERVAL_MS, MIN_ROTATION_INTERVAL_MS,
   type BreakpeekSettings,
 } from './boot-config.ts'
 
@@ -19,4 +20,8 @@ export const Config: Schema<Config> = Schema.object({
     .max(MAX_ROTATION_INTERVAL_MS)
     .default(DEFAULT_BREAKPEEK_CONFIG.rotationIntervalMs)
     .description('Milliseconds between automatic message changes.'),
+  contentSources: Schema.array(Schema.union(BREAKPEEK_CONTENT_SOURCES))
+    .min(1)
+    .default([...DEFAULT_BREAKPEEK_CONFIG.contentSources])
+    .description('Local message libraries included in rotation.'),
 })

@@ -9,7 +9,7 @@ import {
 import { BreakpeekSettingsController } from '../src/client/settings-controller.ts'
 import { zh, type BreakpeekSettingsLocaleKey } from '../src/client/settings-locales.ts'
 import {
-  DEFAULT_BREAKPEEK_CONFIG, type BreakpeekSettings,
+  BREAKPEEK_CONTENT_SOURCES, DEFAULT_BREAKPEEK_CONFIG, type BreakpeekSettings,
 } from '../src/boot-config.ts'
 
 /** Mutable settings scope with synchronous publication for controller tests. */
@@ -56,16 +56,18 @@ function scopeStub(initial: BreakpeekSettings = DEFAULT_BREAKPEEK_CONFIG) {
 }
 
 describe('Breakpeek visual settings', () => {
-  it('stages and persists visibility, rotation, and interval', async () => {
+  it('stages and persists visibility, rotation, interval, and message sources', async () => {
     const controller = new BreakpeekSettingsController(scopeStub())
     const face = controller.inject()
     face.editVisible(false)
     face.editAutoRotate(false)
     face.editRotationIntervalMs(12_000)
+    face.editContentSources(['interview-frontend', 'interview-ai'])
     expect(face.hooks.breakpeekSettingsCard.getSnapshot()).toMatchObject({
       visible: false,
       autoRotate: false,
       rotationIntervalMs: 12_000,
+      contentSources: ['interview-frontend', 'interview-ai'],
       dirty: true,
     })
 
@@ -75,6 +77,7 @@ describe('Breakpeek visual settings', () => {
         visible: false,
         autoRotate: false,
         rotationIntervalMs: 12_000,
+        contentSources: ['interview-frontend', 'interview-ai'],
         dirty: false,
         failed: false,
       })
@@ -101,16 +104,43 @@ describe('Breakpeek visual settings', () => {
     const visibility = screen.getByRole('switch', { name: '显示讯息框' })
     const rotation = screen.getByRole('switch', { name: '自动轮转讯息' })
     const interval = screen.getByRole('spinbutton', { name: '轮转间隔' })
+    const sources = screen.getAllByRole('checkbox')
     expect(visibility.getAttribute('aria-checked')).toBe('true')
     expect(rotation.getAttribute('aria-checked')).toBe('true')
     expect(interval.getAttribute('value')).toBe('7')
+    expect(sources).toHaveLength(BREAKPEEK_CONTENT_SOURCES.length)
+    expect(sources.every(source => (source as HTMLInputElement).checked)).toBe(true)
 
     fireEvent.click(visibility)
     fireEvent.click(rotation)
+    fireEvent.click(screen.getByRole('checkbox', { name: '轻笑话' }))
     expect(face.hooks.breakpeekSettingsCard.getSnapshot()).toMatchObject({
       visible: false,
       autoRotate: false,
+      contentSources: BREAKPEEK_CONTENT_SOURCES.filter(source => source !== 'light-jokes'),
     })
     expect((interval as HTMLInputElement).disabled).toBe(true)
+  })
+
+  it('keeps the final selected message source enabled', () => {
+    const controller = new BreakpeekSettingsController(scopeStub({
+      contentSources: ['interview-ai'],
+    }))
+    const face = controller.inject()
+    const useBreakpeekSettingsCard = <Value,>(
+      selector: (state: ReturnType<typeof face.hooks.breakpeekSettingsCard.getSnapshot>) => Value,
+    ): Value => useSyncExternalStore(
+      face.hooks.breakpeekSettingsCard.subscribe,
+      () => selector(face.hooks.breakpeekSettingsCard.getSnapshot()),
+    )
+    const props = {
+      ...face,
+      useBreakpeekSettingsCard,
+      t: (key: BreakpeekSettingsLocaleKey) => zh[key],
+    } as unknown as BreakpeekSettingsCardProps
+    render(<BreakpeekSettingsCard {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '展开设置: Breakpeek' }))
+    expect((screen.getByRole('checkbox', { name: 'AI 面试题' }) as HTMLInputElement).disabled).toBe(true)
   })
 })

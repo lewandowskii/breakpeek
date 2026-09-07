@@ -1,5 +1,5 @@
 .widget {
-  position: absolute;
+  position: fixed;
   right: 24px;
   bottom: 24px;
   z-index: 21;
@@ -16,12 +16,98 @@
   animation: widget-pop 0.18s ease-out;
 }
 
+.widget[data-expanded='true'][data-expand-direction='up'] {
+  border-radius: 0 0 12px 12px;
+}
+
+.widget[data-expanded='true'][data-expand-direction='down'] {
+  border-radius: 12px 12px 0 0;
+}
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-width: 0;
   border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+}
+
+.details {
+  position: absolute;
+  left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 8px 0;
+  background: var(--dsw-bg-elevated, #1f2430);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+}
+
+.detailsUp {
+  bottom: 100%;
+  border-bottom: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  border-radius: 12px 12px 0 0;
+}
+
+.detailsDown {
+  top: 100%;
+  padding-bottom: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  border-radius: 0 0 12px 12px;
+}
+
+.collapseButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.collapseButton:hover {
+  opacity: 1;
+}
+
+.collapseIcon {
+  flex: none;
+}
+
+.detailViewport {
+  position: relative;
+  min-width: 0;
+}
+
+.detailViewport::after {
+  position: absolute;
+  right: 10px;
+  bottom: 0;
+  left: 0;
+  height: 32px;
+  background: linear-gradient(to bottom, transparent, var(--dsw-bg-elevated, #1f2430));
+  content: '';
+  pointer-events: none;
+}
+
+.detailScroll {
+  box-sizing: border-box;
+  max-height: min(240px, 42vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 8px 32px 4px;
+  color: var(--dsw-fg, #e6e9f0);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  scrollbar-gutter: stable;
 }
 
 .content {
@@ -31,6 +117,20 @@
   min-width: 0;
   width: 100%;
   padding-top: 8px;
+}
+
+.expandableContent {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.expandableContent:hover .expandIcon,
+.expandableContent:focus-visible .expandIcon {
+  opacity: 1;
 }
 
 @keyframes widget-pop {
@@ -56,12 +156,51 @@
   flex: 1;
   font-size: 13px;
   line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.chevron {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  transform-origin: center;
+  transition: transform 0.16s ease, opacity 0.1s ease;
+}
+
+.chevronUp {
+  transform: rotate(180deg);
+}
+
+.chevronDown {
+  transform: none;
+}
+
+.expandIcon {
+  flex: none;
+  opacity: 0.75;
 }
 
 .navigation {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.dragHandle {
+  flex: 1;
+  align-self: stretch;
+  min-width: 44px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.widget[data-dragging='true'] .dragHandle {
+  cursor: grabbing;
 }
 
 .navigationButton,
@@ -97,8 +236,22 @@
 }
 
 .navigationButton:focus-visible,
-.close:focus-visible {
+.close:focus-visible,
+.dragHandle:focus-visible,
+.collapseButton:focus-visible,
+.expandableContent:focus-visible,
+.detailScroll:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 1px;
   opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .widget {
+    animation: none;
+  }
+
+  .chevron {
+    transition: none;
+  }
 }
