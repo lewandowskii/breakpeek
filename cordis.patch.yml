@@ -1,6 +1,6 @@
 - insert:
     - id: ui-breakpeek
-      name: '@deepseek-ai/dsh-client-ui-breakpeek'
+      name: '@runnerzhang/dsh-client-ui-breakpeek'
       config:
         visible: true
         autoRotate: true
@@ -14,3 +14,9 @@
           - interview-ai
           - life-knowledge
           - coding-tips
+        contentCatalogUrl: https://pub-6f34b2d2ff6b44b3b3816069adea0f76.r2.dev/staging/manifest.json
+        contentPublicKeys:
+          staging-2026: |-
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAhCvQl+2MnkqYAdEZ4NgdXHPEo2u24XEWnRsFCIBr9xI=
+            -----END PUBLIC KEY-----

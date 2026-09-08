@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-client-ui-breakpeek",
-  "description": "Breakpeek: a floating lightweight message reader with local rotating content over the frame overlay",
+  "name": "@runnerzhang/dsh-client-ui-breakpeek",
+  "description": "Breakpeek: a floating lightweight message reader with signed remote content and offline fallback",
   "version": "0.1.1-rc.2",
   "packageManager": "pnpm@11.7.0",
   "engines": {

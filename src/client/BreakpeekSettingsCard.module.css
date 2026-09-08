@@ -113,6 +113,13 @@
   margin-top: 10px;
 }
 
+.contentStatus {
+  margin: 8px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .sourceOption {
   display: inline-flex;
   align-items: center;
@@ -133,6 +140,11 @@
   border-color: var(--dsw-alias-brand-primary);
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-primary);
+}
+
+.unavailable {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
 }
 
 .sourceOption:has(.sourceCheckbox:disabled) {

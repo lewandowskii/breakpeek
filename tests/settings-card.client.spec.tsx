@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useSyncExternalStore } from 'react'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import {
+  createSnapshotStore, type SettingsScope, type SettingsScopeSnapshot,
+} from '@deepseek-ai/dsh-client-runtime/client'
 import {
   BreakpeekSettingsCard, type BreakpeekSettingsCardProps,
 } from '../src/client/BreakpeekSettingsCard.tsx'
@@ -11,6 +13,9 @@ import { zh, type BreakpeekSettingsLocaleKey } from '../src/client/settings-loca
 import {
   BREAKPEEK_CONTENT_SOURCES, DEFAULT_BREAKPEEK_CONFIG, type BreakpeekSettings,
 } from '../src/boot-config.ts'
+import type { BreakpeekContentClientState } from '../src/client/content-controller.ts'
+
+afterEach(() => cleanup())
 
 /** Mutable settings scope with synchronous publication for controller tests. */
 function scopeStub(initial: BreakpeekSettings = DEFAULT_BREAKPEEK_CONFIG) {
@@ -56,6 +61,46 @@ function scopeStub(initial: BreakpeekSettings = DEFAULT_BREAKPEEK_CONFIG) {
 }
 
 describe('Breakpeek visual settings', () => {
+  it('publishes remote content status changes into the settings card', () => {
+    const content = createSnapshotStore<BreakpeekContentClientState>({
+      status: 'loading',
+      revision: null,
+      generatedAt: null,
+      checkedAt: null,
+      source: 'fallback',
+      sources: [],
+      items: [],
+    })
+    const controller = new BreakpeekSettingsController(scopeStub(), content)
+    const face = controller.inject()
+
+    content.set({
+      status: 'ready',
+      revision: '20260907123553-eb829ef7a4fdd1c8',
+      generatedAt: '2026-09-07T12:35:53.132Z',
+      checkedAt: '2026-09-07T12:37:52.453Z',
+      source: 'remote',
+      sources: [],
+      items: [{
+        id: 'f298132c-7108-4248-91f2-7a10885d83aa',
+        sourceId: 'light-jokes',
+        sourceLabel: '轻笑话',
+        kind: 'joke',
+        title: '测试',
+        summary: '测试讯息',
+        bodyFormat: 'plain',
+        tags: [],
+      }],
+    })
+
+    expect(face.hooks.breakpeekSettingsCard.getSnapshot()).toMatchObject({
+      contentStatus: 'ready',
+      contentRevision: '20260907123553-eb829ef7a4fdd1c8',
+      contentItemCount: 1,
+    })
+    controller.dispose()
+  })
+
   it('stages and persists visibility, rotation, interval, and message sources', async () => {
     const controller = new BreakpeekSettingsController(scopeStub())
     const face = controller.inject()

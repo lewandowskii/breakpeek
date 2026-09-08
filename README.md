@@ -1,15 +1,15 @@
-# @deepseek-ai/dsh-client-ui-breakpeek
+# @runnerzhang/dsh-client-ui-breakpeek
 
 English | [中文](README.zh.md)
 
-Breakpeek is a persistent floating message widget for the Harness Web GUI. It displays local interview questions, jokes, and technical tips without network requests or credentials. The [SPEC](SPEC.md) defines the proposed inline reader, content sources, and iteration plan.
+Breakpeek is a persistent floating message widget for the Harness Web GUI. Its Host can synchronize a signed remote catalog, retain the last-known-good revision in SQLite, and expose validated content through a same-origin read-only API; the browser never receives publishing credentials. The [SPEC](SPEC.md) defines the inline reader, content sources, and iteration plan.
 
 The browser plugin registers `breakpeek` into the session-scoped `conversation.input.overlay` slot and portals its content into the frame's `[data-shell-overlay]` layer. It also contributes a **Breakpeek** card to **Settings → Plugins → Plugin configuration**. The Node entry validates Cordis configuration, registers the `ui-breakpeek` Host settings namespace, and publishes the resolved settings in the browser boot document.
 
-The panel does not inspect conversation activity or wait for a silence threshold. `visible` is its persisted open state. The close button writes `visible: false`, and the visual settings card can open it again. Drag the unmarked space in the header to reposition the panel; pointer movement is clamped to the visible viewport, and the focused drag area also accepts arrow keys. Messages with a `detail` field show an expand arrow and open an independently scrollable detail area. Details normally open above the panel, but switch below it when the upper edge would leave the viewport. Preview-only messages remain plain text. Expanded details pause automatic rotation. Collapsing restarts a complete `rotationIntervalMs`, while the previous and next buttons collapse any open detail and switch immediately. `contentSources` selects which local libraries participate in both manual and automatic rotation. The default interval is 7000ms and all libraries are enabled by default.
+The panel does not inspect conversation activity or wait for a silence threshold. `visible` is its persisted open state. The close button writes `visible: false`, and the visual settings card can open it again. Drag the unmarked space in the header to reposition the panel; pointer movement is clamped to the visible viewport, and the focused drag area also accepts arrow keys. Messages with a `detail` field show an expand arrow and open an independently scrollable detail area. Details normally open above the panel, but switch below it when the upper edge would leave the viewport. Preview-only messages remain plain text. Expanded details pause automatic rotation. Collapsing restarts a complete `rotationIntervalMs`, while the previous and next buttons collapse any open detail and switch immediately. `contentSources` selects which dynamic libraries participate in both manual and automatic rotation. Remote failure falls back to the SQLite cache and then the built-in pool.
 
 ```yaml
-- name: '@deepseek-ai/dsh-client-ui-breakpeek'
+- name: '@runnerzhang/dsh-client-ui-breakpeek'
   config:
     visible: true
     autoRotate: true
@@ -85,7 +85,7 @@ Remove the local plugin from the profile with:
 
 ```sh
 cd /Users/runner/coding/deepseek-harness
-pnpm dsh plugin --profile web remove @deepseek-ai/dsh-client-ui-breakpeek
+pnpm dsh plugin --profile web remove @runnerzhang/dsh-client-ui-breakpeek
 ```
 
 Package checks prove compilation and component behavior. The config dump proves Profile composition. Final integration validation still requires opening the actual Harness Web UI and checking the floating panel and **Settings → Plugins → Plugin configuration** card.
@@ -98,7 +98,7 @@ Per the project rule in [SPEC.md](SPEC.md), UI inspection may run directly. Buil
 
 #### What the model sees
 
-Nothing. The plugin renders local text from `BREAKPEEK_TIPS`; it does not add messages, tools, or prompt sections to model requests.
+Nothing. Remote or fallback text is presentation-only; the plugin does not add messages, tools, or prompt sections to model requests.
 
 #### Token effect
 

@@ -4,12 +4,11 @@ import { useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import {
-  BREAKPEEK_CONTENT_SOURCES, MAX_ROTATION_INTERVAL_MS, MIN_ROTATION_INTERVAL_MS,
-  type BreakpeekContentSource,
+  MAX_ROTATION_INTERVAL_MS, MIN_ROTATION_INTERVAL_MS, type BreakpeekContentSource,
 } from '../boot-config.ts'
 import type { BreakpeekSettingsCardFace } from './settings-controller.ts'
 import type {
-  BREAKPEEK_SETTINGS_LOCALE, BreakpeekSettingsLocaleKey,
+  BREAKPEEK_SETTINGS_LOCALE,
 } from './settings-locales.ts'
 import css from './BreakpeekSettingsCard.module.css'
 
@@ -19,19 +18,8 @@ export type BreakpeekSettingsCardProps =
   & PropsLocale<typeof BREAKPEEK_SETTINGS_LOCALE>
   & InjectFace<BreakpeekSettingsCardFace>
 
-const CONTENT_SOURCE_OPTIONS = [
-  { value: 'light-jokes', label: 'sourceLightJokes' },
-  { value: 'interview-general', label: 'sourceInterviewGeneral' },
-  { value: 'interview-frontend', label: 'sourceInterviewFrontend' },
-  { value: 'interview-backend', label: 'sourceInterviewBackend' },
-  { value: 'tech-trends', label: 'sourceTechTrends' },
-  { value: 'interview-ai', label: 'sourceInterviewAi' },
-  { value: 'life-knowledge', label: 'sourceLifeKnowledge' },
-  { value: 'coding-tips', label: 'sourceCodingTips' },
-] satisfies readonly { value: BreakpeekContentSource, label: BreakpeekSettingsLocaleKey }[]
-
 /** The same 14px disclosure chevron used by Harness plugin settings cards. */
-function SettingsChevron({ className }: { className?: string }) {
+function SettingsChevron({ className }: { className?: string | undefined }) {
   return (
     <svg
       width="14"
@@ -61,13 +49,35 @@ export function BreakpeekSettingsCard(props: BreakpeekSettingsCardProps) {
   if (!state.available) return null
   const disabled = !state.writable || state.saving
   const intervalSeconds = state.rotationIntervalMs / 1000
+  const availableSources = [...state.availableSources].sort((left, right) => left.order - right.order)
+  const knownIds = new Set(availableSources.map(source => source.id))
+  const sourceOptions = [
+    ...availableSources,
+    ...state.contentSources.filter(source => !knownIds.has(source)).map((source, order) => ({
+      id: source,
+      label: source,
+      description: props.t('sourceUnavailable'),
+      defaultEnabled: false,
+      order: Number.MAX_SAFE_INTEGER - state.contentSources.length + order,
+      available: false,
+    })),
+  ]
   const toggleContentSource = (source: BreakpeekContentSource) => {
     const selected = state.contentSources.includes(source)
-    const next = BREAKPEEK_CONTENT_SOURCES.filter(candidate => (
-      candidate === source ? !selected : state.contentSources.includes(candidate)
-    ))
+    const next = selected
+      ? state.contentSources.filter(candidate => candidate !== source)
+      : [...state.contentSources, source]
     if (next.length > 0) props.editContentSources([...next])
   }
+  const contentStatus = state.contentStatus === 'loading'
+    ? props.t('contentLoading')
+    : state.contentStatus === 'ready'
+      ? props.t('contentReady').replace('{count}', String(state.contentItemCount))
+      : state.contentStatus === 'cached'
+        ? props.t('contentCached').replace('{count}', String(state.contentItemCount))
+        : state.contentStatus === 'error'
+          ? props.t('contentError')
+          : props.t('contentFallback')
   return (
     <li className={open ? `${css.card} ${css.cardOpen}` : css.card}>
       <button
@@ -110,25 +120,30 @@ export function BreakpeekSettingsCard(props: BreakpeekSettingsCardProps) {
                 <p className={css.hint} id="breakpeek-content-sources-hint">
                   {props.t('contentSourcesHint')}
                 </p>
+                <p className={css.contentStatus} role="status">{contentStatus}</p>
                 <div className={css.sourceOptions}>
-                  {CONTENT_SOURCE_OPTIONS.map((option) => {
-                    const checked = state.contentSources.includes(option.value)
+                  {sourceOptions.map((option) => {
+                    const checked = state.contentSources.includes(option.id)
                     const locked = disabled || (checked && state.contentSources.length === 1)
                     return (
                       <label
                         className={checked
                           ? `${css.sourceOption} ${css.sourceOptionSelected}`
                           : css.sourceOption}
-                        key={option.value}
+                        key={option.id}
+                        title={option.description}
                       >
                         <input
                           className={css.sourceCheckbox}
                           type="checkbox"
                           checked={checked}
                           disabled={locked}
-                          onChange={() => { toggleContentSource(option.value) }}
+                          onChange={() => { toggleContentSource(option.id) }}
                         />
-                        <span>{props.t(option.label)}</span>
+                        <span>{option.label}</span>
+                        {option.available === false
+                          ? <span className={css.unavailable}>{props.t('unavailable')}</span>
+                          : null}
                       </label>
                     )
                   })}

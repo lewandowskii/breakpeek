@@ -4,8 +4,12 @@ import {
   createSnapshotStore, type SettingsScope, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import {
+  FALLBACK_CONTENT_SOURCES, type BreakpeekContentSourceDefinition,
+} from '../content-types.ts'
+import {
   type BreakpeekContentSource, type BreakpeekSettings, type ResolvedConfig, resolveConfig,
 } from '../boot-config.ts'
+import type { BreakpeekContentClientState } from './content-controller.ts'
 
 const SETTINGS_FIELDS = ['visible', 'autoRotate', 'rotationIntervalMs', 'contentSources'] as const
 type SettingsField = typeof SETTINGS_FIELDS[number]
@@ -35,6 +39,16 @@ export interface BreakpeekSettingsCardState extends ResolvedConfig {
   saving: boolean
   /** Whether the last requested values were not accepted. */
   failed: boolean
+  /** Catalog entries available for dynamic source selection. */
+  availableSources: BreakpeekContentSourceDefinition[]
+  /** Current remote/cache/fallback content state. */
+  contentStatus: BreakpeekContentClientState['status']
+  /** Active remote content revision. */
+  contentRevision: string | null
+  /** Last successful catalog generation time. */
+  contentGeneratedAt: string | null
+  /** Number of currently available remote items. */
+  contentItemCount: number
 }
 
 /** Business face injected into the Breakpeek settings card. */
@@ -49,7 +63,7 @@ export interface BreakpeekSettingsCardFace {
   editAutoRotate: (value: boolean) => void
   /** Stage the automatic rotation interval in milliseconds. */
   editRotationIntervalMs: (value: number) => void
-  /** Stage the local message libraries included in rotation. */
+  /** Stage the message libraries included in rotation. */
   editContentSources: (value: BreakpeekContentSource[]) => void
   /** Stage removal of all Breakpeek user overrides. */
   reset: () => void
@@ -62,16 +76,20 @@ export interface BreakpeekSettingsCardFace {
 /** Controller for one Breakpeek settings scope. */
 export class BreakpeekSettingsController {
   private readonly store: SnapshotStore<BreakpeekSettingsCardState>
-  private readonly unsubscribe: () => void
+  private readonly unsubscribes: (() => void)[]
   private draft: Partial<ResolvedConfig> = {}
   private resetPending = false
   private saving = false
   private failed = false
 
   /** @param scope - settings scope bound to the `ui-breakpeek` namespace. */
-  constructor(private readonly scope: SettingsScope<BreakpeekSettings>) {
+  constructor(
+    private readonly scope: SettingsScope<BreakpeekSettings>,
+    private readonly content?: SnapshotStore<BreakpeekContentClientState>,
+  ) {
     this.store = createSnapshotStore(this.project())
-    this.unsubscribe = scope.subscribe(() => { this.publish() })
+    this.unsubscribes = [scope.subscribe(() => { this.publish() })]
+    if (content !== undefined) this.unsubscribes.push(content.subscribe(() => { this.publish() }))
   }
 
   private current(): ResolvedConfig {
@@ -97,6 +115,7 @@ export class BreakpeekSettingsController {
     const snapshot = this.scope.getSnapshot()
     const current = this.current()
     const shown = this.shown()
+    const content = this.content?.getSnapshot()
     return {
       available: snapshot.status === 'ready',
       writable: snapshot.writable,
@@ -110,6 +129,11 @@ export class BreakpeekSettingsController {
           && !settingEquals(this.draft[field], current[field])),
       saving: this.saving,
       failed: this.failed,
+      availableSources: content?.sources ?? FALLBACK_CONTENT_SOURCES.map(source => ({ ...source, available: true })),
+      contentStatus: content?.status ?? 'fallback',
+      contentRevision: content?.revision ?? null,
+      contentGeneratedAt: content?.generatedAt ?? null,
+      contentItemCount: content?.items.length ?? 0,
     }
   }
 
@@ -185,6 +209,6 @@ export class BreakpeekSettingsController {
 
   /** Stop observing the settings scope. */
   dispose(): void {
-    this.unsubscribe()
+    for (const unsubscribe of this.unsubscribes) unsubscribe()
   }
 }

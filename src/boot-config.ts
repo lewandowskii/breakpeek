@@ -11,25 +11,18 @@ export const MIN_ROTATION_INTERVAL_MS = 1000
 /** Largest supported automatic rotation interval. */
 export const MAX_ROTATION_INTERVAL_MS = 3_600_000
 
-/** Message libraries that can participate in local rotation. */
-export const BREAKPEEK_CONTENT_SOURCES = [
-  'light-jokes',
-  'interview-general',
-  'interview-frontend',
-  'interview-backend',
-  'tech-trends',
-  'interview-ai',
-  'life-knowledge',
-  'coding-tips',
-] as const
+import { FALLBACK_CONTENT_SOURCES } from './content-types.ts'
 
-/** Identifier for one selectable local message library. */
-export type BreakpeekContentSource = typeof BREAKPEEK_CONTENT_SOURCES[number]
+/** Built-in source identifiers used before the remote catalog is available. */
+export const BREAKPEEK_CONTENT_SOURCES = FALLBACK_CONTENT_SOURCES.map(source => source.id)
 
-/** Whether a raw value names a supported local message library. */
+/** Identifier for one selectable dynamic or built-in message library. */
+export type BreakpeekContentSource = string
+
+/** Whether a raw value is a safe message-library identifier. */
 export function isBreakpeekContentSource(value: unknown): value is BreakpeekContentSource {
   return typeof value === 'string'
-    && (BREAKPEEK_CONTENT_SOURCES as readonly string[]).includes(value)
+    && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value)
 }
 
 /** User-editable Breakpeek settings shared with the browser. */
@@ -40,7 +33,7 @@ export interface BreakpeekSettings {
   autoRotate?: boolean
   /** Milliseconds between automatic message changes. */
   rotationIntervalMs?: number
-  /** Local message libraries included in manual and automatic rotation. */
+  /** Message libraries included in manual and automatic rotation. */
   contentSources?: BreakpeekContentSource[]
 }
 
@@ -52,7 +45,7 @@ export interface ResolvedConfig {
   autoRotate: boolean
   /** Milliseconds between automatic message changes. */
   rotationIntervalMs: number
-  /** Local message libraries included in manual and automatic rotation. */
+  /** Message libraries included in manual and automatic rotation. */
   contentSources: BreakpeekContentSource[]
 }
 

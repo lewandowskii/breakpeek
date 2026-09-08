@@ -7,11 +7,17 @@ import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import {
   BREAKPEEK_CONFIG_GLOBAL, BREAKPEEK_SETTINGS_NAMESPACE, resolveConfig,
 } from './boot-config.ts'
-import { Config, type Config as BreakpeekConfig } from './config.ts'
+import { createContentRoute } from './content/api.ts'
+import { BreakpeekContentService } from './content/service.ts'
+import { Config, SettingsConfig, type Config as BreakpeekConfig } from './config.ts'
 
 export { Config }
 export type { ResolvedConfig } from './boot-config.ts'
 export type { Config as BreakpeekConfig } from './config.ts'
+export type {
+  BreakpeekCatalogResponse, BreakpeekContentItem, BreakpeekContentSourceDefinition,
+  BreakpeekItemsResponse,
+} from './content-types.ts'
 
 /**
  * Publish the resolved configuration whenever the Host assembles a browser boot document.
@@ -23,8 +29,8 @@ export function apply(ctx: Context, config: BreakpeekConfig = {}): void {
   ctx.inject(['settings'], (settingsCtx) => {
     const scope = settingsCtx.settings.register(
       settingsNamespace(BREAKPEEK_SETTINGS_NAMESPACE),
-      Config,
-      { base: config },
+      SettingsConfig,
+      { base: resolveConfig(config) },
     )
     const refresh = (): void => {
       current = resolveConfig(scope.get())
@@ -41,5 +47,18 @@ export function apply(ctx: Context, config: BreakpeekConfig = {}): void {
       name: BREAKPEEK_CONFIG_GLOBAL,
       value: current,
     })
+  })
+  ctx.inject(['webServer'], (webCtx) => {
+    const content = new BreakpeekContentService(webCtx, config)
+    webCtx.effect(() => {
+      const unregister = webCtx.webServer.register(createContentRoute(content))
+      void content.start().catch((error: unknown) => {
+        webCtx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+      })
+      return async () => {
+        unregister()
+        await content.dispose()
+      }
+    }, 'ui-breakpeek: content service and HTTP API')
   })
 }

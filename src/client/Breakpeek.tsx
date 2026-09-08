@@ -1,9 +1,9 @@
 /**
- * Breakpeek's floating local message panel. It registers into the
+ * Breakpeek's floating message panel. It registers into the
  * `conversation.input.overlay` slot and portals into the frame's
  * `[data-shell-overlay]` layer. Visibility and automatic rotation come from
  * the plugin settings namespace; expanded details pause timed rotation.
- * @module @deepseek-ai/dsh-client-ui-breakpeek/Breakpeek
+ * @module @runnerzhang/dsh-client-ui-breakpeek/Breakpeek
  */
 import {
   useCallback, useEffect, useLayoutEffect, useRef, useState,
@@ -13,13 +13,15 @@ import type {
 } from 'react'
 import { createPortal } from 'react-dom'
 import type {
-  ObservableSnapshot, SettingsScopeSnapshot,
+  ObservableSnapshot, SettingsScopeSnapshot, SnapshotStore,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   type BreakpeekSettings, type ResolvedConfig,
 } from '../boot-config.ts'
 import { BREAKPEEK_TIPS } from './breakpeek-tips.ts'
+import type { BreakpeekTip } from './breakpeek-tips.ts'
+import type { BreakpeekContentClientState } from './content-controller.ts'
 import css from './Breakpeek.module.css'
 
 /** Registration-side settings and actions. */
@@ -29,6 +31,8 @@ interface BreakpeekInjected {
   hooks: {
     /** Live user settings for the message panel. */
     breakpeekSettings: ObservableSnapshot<SettingsScopeSnapshot<BreakpeekSettings>>
+    /** Host-validated remote content with cache/fallback status. */
+    breakpeekContent: SnapshotStore<BreakpeekContentClientState>
   }
   /**
    * Persist the panel's visibility.
@@ -57,12 +61,42 @@ const KEYBOARD_DRAG_OFFSETS: Partial<Record<string, readonly [number, number]>> 
   ArrowDown: [0, KEYBOARD_DRAG_STEP],
 }
 
+const SOURCE_FACES: Readonly<Record<string, string>> = {
+  'light-jokes': '🐻',
+  'interview-general': '🐙',
+  'interview-frontend': '🐠',
+  'interview-backend': '🐬',
+  'interview-ai': '🦄',
+  'tech-trends': '🐨',
+  'life-knowledge': '🐸',
+  'coding-tips': '🦉',
+}
+
+const EMPTY_TIP: BreakpeekTip = {
+  id: 'breakpeek-empty-selection',
+  index: 0,
+  face: '🐧',
+  preview: '暂无符合当前资料库选择的讯息，请在 Breakpeek 设置中调整来源。',
+  type: 'system',
+}
+
+function remoteTip(item: BreakpeekContentClientState['items'][number], index: number): BreakpeekTip {
+  return {
+    id: item.id,
+    index,
+    face: SOURCE_FACES[item.sourceId] ?? '🐧',
+    preview: item.summary,
+    ...(item.body === undefined ? {} : { detail: item.body }),
+    type: item.sourceId,
+  }
+}
+
 /** Directional chevron matching Harness's compact disclosure controls. */
 function ChevronIcon({
   className = '',
   direction,
 }: {
-  className?: string
+  className?: string | undefined
   direction: 'up' | 'down'
 }) {
   const directionClassName = direction === 'up' ? css.chevronUp : css.chevronDown
@@ -129,9 +163,11 @@ export function Breakpeek(props: BreakpeekProps) {
   const contentSources = props.useBreakpeekSettings(snapshot => snapshot.status === 'ready'
     ? snapshot.value?.contentSources ?? props.bootConfig.contentSources
     : props.bootConfig.contentSources)
+  const content = props.useBreakpeekContent(snapshot => snapshot)
   const [dismissed, setDismissed] = useState(false)
-  const [index, setIndex] = useState(0)
+  const [currentId, setCurrentId] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
+  const [lockedTip, setLockedTip] = useState<BreakpeekTip | null>(null)
   const [expansionDirection, setExpansionDirection] = useState<ExpansionDirection>('up')
   const [position, setPosition] = useState<PanelPosition | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -142,8 +178,14 @@ export function Breakpeek(props: BreakpeekProps) {
   const latestPointer = useRef({ x: 0, y: 0 })
   const dragFrame = useRef<number | null>(null)
   const contentSourcesKey = contentSources.join('\u0000')
-  const selectedTips = BREAKPEEK_TIPS.filter(tip => contentSources.includes(tip.type))
-  const tips = selectedTips.length > 0 ? selectedTips : BREAKPEEK_TIPS
+  const contentPool = content.items.length > 0
+    ? content.items.map(remoteTip)
+    : BREAKPEEK_TIPS
+  const selectedTips = contentPool.filter(tip => contentSources.includes(tip.type))
+  const tips = selectedTips.length > 0 ? selectedTips : [EMPTY_TIP]
+  const candidateIndex = Math.max(0, currentId === null ? 0 : tips.findIndex(tip => tip.id === currentId))
+  const candidateTip = tips[candidateIndex] ?? BREAKPEEK_TIPS[0]
+  const tip = expanded && lockedTip !== null ? lockedTip : candidateTip
 
   const currentGeometry = useCallback(() => {
     const panel = widgetRef.current?.getBoundingClientRect()
@@ -253,7 +295,8 @@ export function Breakpeek(props: BreakpeekProps) {
 
   useEffect(() => {
     setExpanded(false)
-    setIndex(0)
+    setLockedTip(null)
+    setCurrentId(null)
   }, [contentSourcesKey])
 
   const shown = visible && !dismissed
@@ -261,12 +304,13 @@ export function Breakpeek(props: BreakpeekProps) {
     if (!shown || expanded || dragging || !autoRotate || tips.length < 2) return
     const id = setTimeout(() => {
       setExpanded(false)
-      setIndex(current => wrapIndex(current + 1, tips.length))
+      setLockedTip(null)
+      setCurrentId(tips[wrapIndex(candidateIndex + 1, tips.length)]?.id ?? null)
     }, rotationIntervalMs)
     return () => {
       clearTimeout(id)
     }
-  }, [autoRotate, contentSourcesKey, dragging, expanded, index, rotationIntervalMs, shown, tips.length])
+  }, [autoRotate, candidateIndex, content.revision, contentSourcesKey, dragging, expanded, rotationIntervalMs, shown, tips.length])
 
   useEffect(() => {
     if (!shown || !expanded) return
@@ -315,8 +359,7 @@ export function Breakpeek(props: BreakpeekProps) {
   const host = overlayHost()
   if (host === null) return null
 
-  const tip = tips[wrapIndex(index, tips.length)] ?? BREAKPEEK_TIPS[0]
-  const detailId = `breakpeek-detail-${tip.index}`
+  const detailId = `breakpeek-detail-${tip.id}`
   const panelStyle = position === null
     ? undefined
     : {
@@ -327,16 +370,19 @@ export function Breakpeek(props: BreakpeekProps) {
       } satisfies CSSProperties
   const move = (offset: number) => {
     setExpanded(false)
-    setIndex(current => wrapIndex(current + offset, tips.length))
+    setLockedTip(null)
+    setCurrentId(tips[wrapIndex(candidateIndex + offset, tips.length)]?.id ?? null)
   }
   const toggleExpanded = () => {
     if (expanded) {
       setExpanded(false)
+      setLockedTip(null)
       return
     }
     const panel = widgetRef.current?.getBoundingClientRect()
     if (panel !== undefined) setPosition({ left: panel.left, top: panel.top })
     setExpansionDirection('up')
+    setLockedTip(candidateTip)
     setExpanded(true)
   }
   const details = expanded && tip.detail !== undefined
@@ -351,7 +397,10 @@ export function Breakpeek(props: BreakpeekProps) {
             className={css.collapseButton}
             type="button"
             aria-label="收起讯息详情"
-            onClick={() => { setExpanded(false) }}
+            onClick={() => {
+              setExpanded(false)
+              setLockedTip(null)
+            }}
           >
             <span>收起</span>
             <ChevronIcon
@@ -373,6 +422,7 @@ export function Breakpeek(props: BreakpeekProps) {
       className={css.widget}
       style={panelStyle}
       data-message-index={tip.index}
+      data-message-id={tip.id}
       data-message-type={tip.type}
       data-expanded={expanded || undefined}
       data-expand-direction={expanded ? expansionDirection : undefined}

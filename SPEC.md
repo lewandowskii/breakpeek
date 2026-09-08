@@ -7,7 +7,7 @@
 | 更新日期 | 2026-09-06 |
 | 适用范围 | Harness Web 轻讯息插件的产品需求、技术设计与验收规范 |
 
-本文面向产品设计和插件开发，分析对象是 Breakpeek 独立项目；代码基线日期为 2026-09-03。第 1 节记录读取时的实现，后续章节均为待实现需求。产品名称为 **Breakpeek**，插件包名为 `@deepseek-ai/dsh-client-ui-breakpeek`，代码位于本项目根目录。
+本文面向产品设计和插件开发，分析对象是 Breakpeek 独立项目；代码基线日期为 2026-09-03。第 1 节记录读取时的实现，后续章节均为待实现需求。产品名称为 **Breakpeek**，插件包名为 `@runnerzhang/dsh-client-ui-breakpeek`，代码位于本项目根目录。
 
 规范用语：“必须／不得”表示验收要求，“建议”表示允许在实施评审中调整的方案，“可选／后续”表示首期之外的能力。F 编号标识功能需求，A 编号标识验收场景；P0–P3 表示迭代阶段。
 
@@ -15,21 +15,23 @@
 
 ### 1.1 设计目的与实际行为
 
-现有设计是在 Harness 页面中持续展示不依赖网络的短内容。它是页面内的 React 浮窗，通过 Cordis 插件安装，不是操作系统桌面窗口，也不具备浏览器关闭后的后台通知能力。
+现有设计是在 Harness 页面中持续展示短内容；远程不可用时仍能依靠最近有效缓存或内置内容工作。它是页面内的 React 浮窗，通过 Cordis 插件安装，不是操作系统桌面窗口，也不具备浏览器关闭后的后台通知能力。
 
-当前 [Breakpeek](src/client/Breakpeek.tsx) 不读取会话状态或静默时间。`visible` 直接表示浮窗的打开状态；浮窗关闭按钮与统一插件设置页读写同一字段。`autoRotate` 和 `rotationIntervalMs` 控制定时切换，`contentSources` 筛选手动与自动轮转的本地资料库。可展开讯息提供原位详情；当前版本没有远程内容源或发送接口。
+当前 [Breakpeek](src/client/Breakpeek.tsx) 不读取会话状态或静默时间。`visible` 直接表示浮窗的打开状态；浮窗关闭按钮与统一插件设置页读写同一字段。`autoRotate` 和 `rotationIntervalMs` 控制定时切换，`contentSources` 筛选手动与自动轮转的动态资料库。可展开讯息提供原位详情；Host 已支持签名远程目录、SQLite 最近有效缓存和同源只读内容 API，不提供发送接口。
 
 ### 1.2 代码框架与职责
 
 | 文件或入口 | 已有职责 | 后续处理方向 |
 |---|---|---|
 | [package.json](package.json) | 声明 Node、`./client`、`./invariant` 出口，以及 `dsh.client.platform = web` | 保留双入口插件结构，按新依赖调整声明 |
-| [src/config.ts](src/config.ts)、[src/boot-config.ts](src/boot-config.ts) | 声明 `visible`、`autoRotate`、`rotationIntervalMs`、`contentSources` Cordis schema、默认值与浏览器启动配置解析 | 随后续内容源扩展 schema |
-| [src/index.ts](src/index.ts) 的 `apply()` | 注册 `ui-breakpeek` settings namespace，以 Cordis 配置为默认层，并将解析值贡献为浏览器启动数据 | 随后续设置字段扩展 schema |
+| [src/config.ts](src/config.ts)、[src/boot-config.ts](src/boot-config.ts) | 声明用户设置与 Host 内容目录、缓存、签名配置，并解析浏览器启动设置 | 保持部署信任字段不进入设置 wire |
+| [src/index.ts](src/index.ts) 的 `apply()` | 注册 settings namespace、浏览器启动数据、内容服务和同源路由 | 由 Cordis effect 统一释放 |
 | [src/client/index.ts](src/client/index.ts) 的 `apply(ctx)` | 读取启动配置、绑定实时 settings scope，并注册浮窗及插件配置卡片 | 后续改为 root 浮窗注册，消除会话 slot 依赖 |
 | [Breakpeek.tsx](src/client/Breakpeek.tsx) | 按显示和轮转设置管理内容索引、前后切换及关闭，并通过 Portal 渲染 | 拆出共享状态和阅读组件 |
-| [BreakpeekSettingsCard.tsx](src/client/BreakpeekSettingsCard.tsx)、[settings-controller.ts](src/client/settings-controller.ts) | 在统一插件配置页中展示、暂存、保存及重置显示、轮转和资料库多选设置 | 随后续内容源扩展控件 |
-| [breakpeek-tips.ts](src/client/breakpeek-tips.ts) | 本地讯息对象含 `index`、`preview`、可选 `detail` 和资料库 `type` | 后续将资料库从单文件拆分为可注册内容源 |
+| [BreakpeekSettingsCard.tsx](src/client/BreakpeekSettingsCard.tsx)、[settings-controller.ts](src/client/settings-controller.ts) | 展示动态目录和缓存状态，暂存、保存及重置显示、轮转和资料库多选设置 | 保留已选但暂不可用的来源 |
+| [breakpeek-tips.ts](src/client/breakpeek-tips.ts) | 内置兜底讯息对象含稳定 `id`、`index`、`preview`、可选 `detail` 和资料库 `type` | 远端与缓存均不可用时使用 |
+| [src/content](src/content) | Host 远程同步、Ed25519/哈希校验、SQLite 最近有效缓存与同源 API | 部署者配置目录 URL 和可信公钥 |
+| [content-controller.ts](src/client/content-controller.ts) | 浏览器读取同源目录与分页内容，处理刷新、取消和降级 | 不接触 CDN 凭证 |
 | [Breakpeek.module.css](src/client/Breakpeek.module.css) | 右下角定位、布局、外观与入场动画 | 转为摘要／详情两种布局及完整主题 token |
 | [src/invariant.ts](src/invariant.ts) | 注册空 invariant installer，理由是没有跨插件可变数据 | 实施后重新判断是否存在需要验证的数据关系 |
 | [组件测试](tests/breakpeek.client.spec.tsx) | 描述显示开关、手动前后切换、定时轮转及点击关闭 | 补充注册释放与真实组装验证 |
@@ -197,7 +199,7 @@ Breakpeek 是嵌入 Harness Web 界面的轻讯息投递与阅读插件。它在
 
 首期从筛选后的本地池依次选择；同一轮候选遍历不重复，遍历完可重新开始，但跳过本次页面已关闭条目。池为空时自动模式安静等待，手动查看显示“暂无符合条件的内容”及设置入口。队列上限、单条正文大小和保留时间要由 owning provider 明确给出并验证，过期条目优先清理，队列满时淘汰最旧的未展示候选，不能替换正在阅读的条目。
 
-后续远程来源通过宿主插件获取并返回结构化内容，客户端不持有抓取密钥。按需读取正文时提供加载、失败、重试状态；关闭、切换条目或卸载后取消请求，并用条目身份和请求代次阻止迟到响应覆盖当前内容。没有全文时只展示已取得的摘要及说明，不自动跳转来源网站。
+远程来源通过宿主插件获取并返回结构化内容，客户端不持有抓取密钥。目录和正文读取提供加载、失败与缓存状态；切换修订或卸载后取消请求，并用条目身份和请求代次阻止迟到响应覆盖当前内容。没有全文时只展示已取得的摘要，不自动跳转来源网站。
 
 远程内容按不可信输入解析：限制正文大小，禁用原始 HTML 和脚本 URL；代码块仅用于展示。它默认不进入模型上下文。将来若支持模型生成或“就此提问”，必须显式启用，并遵守仓库的模型可见内容日志要求。
 
@@ -249,7 +251,7 @@ tests/
 |---|---|---|---|
 | P0：可靠原型 | 持久化显示开关、自动轮转开关与频率、手动前后切换、关闭同步设置；恢复可信测试 | 显示／隐藏、保存／重置、手动切换和定时轮转可验证，卸载无残留 | 对本文关闭与轮转语义完成评审 |
 | P1：首期可用版本 | 摘要与原位详情、本地完整内容、设置保存反馈和预览；完成 root 浮窗注册 | 面试题可看答案，新闻示例可读正文；设置刷新后按宿主能力恢复；展开期间暂停轮转 | P0，设置入口动作确定 |
-| P2：多内容源 | 宿主新闻 provider、刷新与缓存、来源／类别筛选、去重过期、加载失败与取消；周期投递及免打扰 | 真实来源从获取到原位阅读全链路通过，断网及迟到响应行为明确 | P1；新闻源、凭据方式及正文可取得范围明确 |
+| P2：多内容源（已实现基础链路） | Host 签名目录、定时刷新、SQLite 最近有效缓存、动态来源筛选、去重过期、加载失败与取消 | R2 staging 从获取到原位阅读全链路通过，断网及迟到响应行为明确 | 尚需部署凭据与真实 Profile 验收 |
 | P3：阅读体验 | 有界已读历史／收藏／稍后读、位置偏好、可选排序 | 用户能主动回看；存储有容量与清理规则；多标签页重复策略明确 | P2 或独立的持久化回看需求 |
 
 P0 和 P1 共同构成第一轮可发布目标；仅修正显示问题不能算完成本需求。P2 的远程来源和周期调度可分别交付，但都遵守阅读锁定及关闭语义。P3 不作为首期前置条件。

@@ -11,6 +11,8 @@ import { BREAKPEEK_TIPS } from '../src/client/breakpeek-tips.ts'
 import {
   DEFAULT_BREAKPEEK_CONFIG, type BreakpeekSettings, type ResolvedConfig,
 } from '../src/boot-config.ts'
+import { FALLBACK_CONTENT_SOURCES } from '../src/content-types.ts'
+import type { BreakpeekContentClientState } from '../src/client/content-controller.ts'
 
 const unusedStandardHook = (): never => { throw new Error('unexpected standard-kit access') }
 
@@ -31,6 +33,15 @@ function runtimeProps(settings: ResolvedConfig, setVisible = vi.fn(async () => t
     writable: true,
     mode: 'host',
   }
+  const contentSnapshot: BreakpeekContentClientState = {
+    status: 'fallback',
+    revision: null,
+    generatedAt: null,
+    checkedAt: null,
+    source: 'fallback',
+    sources: FALLBACK_CONTENT_SOURCES.map(source => ({ ...source, available: true })),
+    items: [],
+  }
   return {
     useSession: unusedStandardHook,
     sessionId: 's1' as SessionId,
@@ -47,6 +58,8 @@ function runtimeProps(settings: ResolvedConfig, setVisible = vi.fn(async () => t
     useProjection: () => undefined,
     useBreakpeekSettings: <T,>(selector: (value: SettingsScopeSnapshot<BreakpeekSettings>) => T) =>
       selector(snapshot),
+    useBreakpeekContent: <T,>(selector: (value: BreakpeekContentClientState) => T) =>
+      selector(contentSnapshot),
     bootConfig: DEFAULT_BREAKPEEK_CONFIG,
     setVisible,
   } satisfies PropsRuntime<'conversation.input.overlay'> & Record<string, unknown>
@@ -142,7 +155,7 @@ describe('Breakpeek', () => {
     const host = overlayHostNode()
     render(<Breakpeek {...runtimeProps({ ...DEFAULT_BREAKPEEK_CONFIG, autoRotate: false })} />)
     const widget = host.querySelector<HTMLElement>('[data-message-index]')!
-    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
       if ((this as Element).getAttribute('aria-label') === '讯息详情') {
         return {
           width: 280, height: 200, left: 100, top: -196, right: 380, bottom: 4,

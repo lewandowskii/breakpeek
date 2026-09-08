@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { transform } from 'lightningcss'
 import type { UserConfig } from 'tsdown'
 
-const PACKAGE_ID = '@deepseek-ai/dsh-client-ui-breakpeek'
+const PACKAGE_ID = '@runnerzhang/dsh-client-ui-breakpeek'
 const PACKAGE_ROOT = fileURLToPath(new URL('..', import.meta.url))
 const PACKAGE_MANIFEST = JSON.parse(
   readFileSync(resolve(PACKAGE_ROOT, 'package.json'), 'utf8'),

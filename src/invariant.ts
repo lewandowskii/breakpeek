@@ -1,13 +1,13 @@
 /**
- * Package-owned invariant companion for `@deepseek-ai/dsh-client-ui-breakpeek`.
- * @module @deepseek-ai/dsh-client-ui-breakpeek/invariant
+ * Package-owned invariant companion for `@runnerzhang/dsh-client-ui-breakpeek`.
+ * @module @runnerzhang/dsh-client-ui-breakpeek/invariant
  */
 
 /* jscpd:ignore-start */
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-breakpeek'
+const PACKAGE_NAME = '@runnerzhang/dsh-client-ui-breakpeek'
 
 /** Cordis companion plugin name. */
 export const name = 'client-ui-breakpeek-invariant'
@@ -15,10 +15,9 @@ export const name = 'client-ui-breakpeek-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: a single `conversation.input.overlay` entry whose
- * disposal is proven by the HMR-safety spec — the widget owns no store,
- * emits no cordis events, reads only the framework session snapshot, and
- * holds no cross-plugin mutable state.
+ * No additional runtime invariant: HTTP route, timers, requests, SQLite and
+ * browser stores are all owned by labelled Cordis effects and are exercised
+ * through lifecycle tests rather than a cross-plugin mutable-state assertion.
  */
 const install: InvariantInstaller = () => {}
 

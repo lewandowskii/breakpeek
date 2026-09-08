@@ -62,7 +62,7 @@ describe('ui-breakpeek configuration', () => {
     )
   })
 
-  it('accepts old bootstrap data and validates configured message sources', () => {
+  it('accepts old bootstrap data and dynamically named message sources', () => {
     expect(parseBootConfig({
       visible: true,
       autoRotate: false,
@@ -79,11 +79,17 @@ describe('ui-breakpeek configuration', () => {
       rotationIntervalMs: 7000,
       contentSources: [],
     })).toThrow(`globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
+    expect(parseBootConfig({
+      visible: true,
+      autoRotate: true,
+      rotationIntervalMs: 7000,
+      contentSources: ['future-library'],
+    }).contentSources).toEqual(['future-library'])
     expect(() => parseBootConfig({
       visible: true,
       autoRotate: true,
       rotationIntervalMs: 7000,
-      contentSources: ['not-a-library'],
+      contentSources: ['unsafe/library'],
     })).toThrow(`globalThis.${BREAKPEEK_CONFIG_GLOBAL} must contain valid display settings`)
   })
 

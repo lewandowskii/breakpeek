@@ -1,15 +1,15 @@
 /**
- * Local rotating content pool for the Breakpeek. Deterministic, local-only
- * (jokes / interview snippets / quick tips) so the widget needs no network and
- * no credentials.
- * @module @deepseek-ai/dsh-client-ui-breakpeek/breakpeek-tips
+ * Deterministic built-in fallback pool used while Host content is unavailable.
+ * @module @runnerzhang/dsh-client-ui-breakpeek/breakpeek-tips
  */
 
 import type { BreakpeekContentSource } from '../boot-config.ts'
 
 /** One ambient message shown while the agent is at work. */
 export interface BreakpeekTip {
-  /** Stable display order in the local message pool. */
+  /** Stable content identity across catalog revisions. */
+  id: string
+  /** Stable display order in the built-in message pool. */
   index: number
   /** Decorative glyph displayed beside the message. */
   face: string
@@ -17,13 +17,14 @@ export interface BreakpeekTip {
   preview: string
   /** Optional long-form copy shown in the expanded panel. */
   detail?: string
-  /** Local library used by presentation filtering. */
+  /** Library used by presentation filtering. */
   type: BreakpeekContentSource
 }
 
-/** Local rotating pool; wrap around via `index % TIPS.length`. */
+/** Built-in rotating pool; wrap around via `index % TIPS.length`. */
 export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
   {
+    id: '413e667e-f968-42ff-9d1d-9661539bc6ab',
     index: 0,
     face: '🐠',
     preview: '面试题：解释 async/await 在事件循环里的行为。',
@@ -31,12 +32,14 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'interview-frontend',
   },
   {
+    id: '052e5878-604a-48ab-a84e-425e3d61feaf',
     index: 1,
     face: '🐸',
     preview: '生活常识：蜂蜜应密封放在阴凉处，通常不需要放进冰箱。',
     type: 'life-knowledge',
   },
   {
+    id: '15a2aa7c-d1c1-4a2d-99c6-0f49ac023c0b',
     index: 2,
     face: '🦉',
     preview: '小贴士：把长函数拆成命名清晰的小函数，比注释更可靠。',
@@ -44,6 +47,7 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'coding-tips',
   },
   {
+    id: 'e61dc501-9109-463e-9971-92fdf953e855',
     index: 3,
     face: '🐙',
     preview: '面试题：进程、线程与协程的区别？一句话各答。',
@@ -51,12 +55,14 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'interview-general',
   },
   {
+    id: 'f298132c-7108-4248-91f2-7a10885d83aa',
     index: 4,
     face: '🐻',
     preview: '笑话：程序员最讨厌的三件事——写注释、看注释、别人不写注释。',
     type: 'light-jokes',
   },
   {
+    id: '9ad9c3ba-5589-4b07-bbf9-c200dbad8273',
     index: 5,
     face: '🐨',
     preview: '技术风向：RAG 之外，Agentic 工作流正在把“检索”变成“编排”。',
@@ -64,12 +70,14 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'tech-trends',
   },
   {
+    id: '386375e5-8f1d-48c9-aa0c-9d31201007b3',
     index: 6,
     face: '🐧',
     preview: '冷知识：diff 里的 “a/” 与 “b/” 前缀来自 `git` 的对树对比。',
     type: 'coding-tips',
   },
   {
+    id: '4bbb58c9-45b5-4cb4-915e-6758d765db18',
     index: 7,
     face: '🦊',
     preview: '面试题：跨域请求为什么浏览器要先发一个 OPTIONS 预检？',
@@ -77,6 +85,7 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'interview-frontend',
   },
   {
+    id: '84c79b30-5318-4cdb-a448-f57bf48cad2a',
     index: 8,
     face: '🐬',
     preview: '后端面试题：数据库索引为什么能加速查询，却可能拖慢写入？',
@@ -84,6 +93,7 @@ export const BREAKPEEK_TIPS: [BreakpeekTip, ...BreakpeekTip[]] = [
     type: 'interview-backend',
   },
   {
+    id: 'f750025e-3176-4ea6-a506-fc5fb0e0240c',
     index: 9,
     face: '🦄',
     preview: 'AI 面试题：大模型里的 temperature 控制了什么？',

@@ -1,9 +1,9 @@
 /**
- * Breakpeek plugin, browser half: the floating local message widget. It
+ * Breakpeek plugin, browser half: the floating message widget. It
  * registers one entry into the session-scoped `conversation.input.overlay`
  * seat (declared by ui-conversation) and owns no store, no event listener and
- * no Remote calls — the live session arrives through the standard hooks.
- * @module @deepseek-ai/dsh-client-ui-breakpeek/client
+ * reads only the plugin's same-origin content API; the live session arrives through standard hooks.
+ * @module @runnerzhang/dsh-client-ui-breakpeek/client
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -14,6 +14,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import { Breakpeek } from './Breakpeek.tsx'
 import { BreakpeekSettingsCard } from './BreakpeekSettingsCard.tsx'
+import { BreakpeekContentController } from './content-controller.ts'
 import { BreakpeekSettingsController } from './settings-controller.ts'
 import {
   BREAKPEEK_SETTINGS_LOCALE, en, type BreakpeekSettingsLocaleKey, zh,
@@ -45,9 +46,15 @@ export function apply(ctx: ClientContext): void {
   const widgetSettings = ctx.settingsScope.bind<BreakpeekSettings>({
     namespace: BREAKPEEK_SETTINGS_NAMESPACE,
   })
+  const content = new BreakpeekContentController()
   const card = new BreakpeekSettingsController(
     ctx.settingsScope.bind<BreakpeekSettings>({ namespace: BREAKPEEK_SETTINGS_NAMESPACE }),
+    content.store,
   )
+  ctx.effect(() => {
+    content.start()
+    return () => { content.dispose() }
+  }, 'ui-breakpeek: content controller')
   ctx.effect(() => () => { card.dispose() }, 'ui-breakpeek: settings card')
   ctx.effect(
     () => ctx.locale.register(BREAKPEEK_SETTINGS_LOCALE, { zh, en }),
@@ -60,7 +67,7 @@ export function apply(ctx: ClientContext): void {
     label: () => 'Breakpeek',
     inject: () => ({
       bootConfig,
-      hooks: { breakpeekSettings: widgetSettings },
+      hooks: { breakpeekSettings: widgetSettings, breakpeekContent: content.store },
       setVisible: async (visible: boolean) => {
         await widgetSettings.set('visible', visible)
         return widgetSettings.getSnapshot().value?.visible === visible
