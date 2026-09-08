@@ -8,6 +8,23 @@ Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。Host 可从签名
 
 浮窗不检查会话活动，也不等待静默阈值。`visible` 是持久化的打开状态；关闭按钮写入 `visible: false`，用户可从可视化设置卡片重新打开。拖动操作区中间无标记的空白区域可调整浮窗位置，移动范围限制在当前可视页面内；该区域获得焦点后也可用方向键移动。含 `detail` 字段的讯息会显示展开箭头，并打开可独立滚动的详情。详情默认向上展开；如果顶部将超出可视范围，则自动改为向下展开。仅有预览的讯息保持普通文本。详情展开时暂停自动轮转，收起后从一个完整的 `rotationIntervalMs` 重新计时；前后按钮会先收起详情再立即切换。`contentSources` 决定手动与自动轮转使用哪些动态资料库。远端不可用时依次使用 SQLite 缓存和插件内置内容。
 
+## 安装
+
+正式包发布后，可将预构建的 npm 组合包安装到 DSH Web Profile：
+
+```sh
+dsh plugin --profile web add @runnerzhang/dsh-client-ui-breakpeek
+dsh web
+```
+
+Breakpeek 声明了 `dsh.bundle` 配置层，因此 `dsh plugin` 会同时把 npm 依赖和 bundle 条目加入指定 Profile。删除时执行：
+
+```sh
+dsh plugin --profile web remove @runnerzhang/dsh-client-ui-breakpeek
+```
+
+## 配置
+
 ```yaml
 - name: '@runnerzhang/dsh-client-ui-breakpeek'
   config:
@@ -23,13 +40,15 @@ Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。Host 可从签名
       - interview-ai
       - life-knowledge
       - coding-tips
-    contentCatalogUrl: https://pub-example.r2.dev/staging/manifest.json
+    contentCatalogUrl: https://content.example.com/production/manifest.json
     contentPublicKeys:
-      staging-2026: |-
+      production-2026: |-
         -----BEGIN PUBLIC KEY-----
-        MCowBQYDK2VwAyEAhCvQl+2MnkqYAdEZ4NgdXHPEo2u24XEWnRsFCIBr9xI=
+        REPLACE_WITH_THE_TRUSTED_ED25519_PUBLIC_KEY
         -----END PUBLIC KEY-----
     allowUnsignedContent: false
+    contentRefreshIntervalMs: 21600000
+    contentRequestTimeoutMs: 10000
 ```
 
 远程目录必须使用 HTTPS。Host 会验证 Manifest 的 Ed25519 签名和每个 NDJSON 文件的 SHA-256；私钥只应放在内容仓库的 GitHub Actions Secret 中。开发期可临时使用 `allowUnsignedContent: true`，正式发布必须关闭。缓存默认位于 `$DSH_HOME/storages/breakpeek-content.sqlite`。
@@ -37,6 +56,18 @@ Breakpeek 是 Harness Web GUI 的常驻轻讯息浮窗插件。Host 可从签名
 Host 提供 `/breakpeek/api/v1/catalog`、`/breakpeek/api/v1/items` 和 `/breakpeek/api/v1/status` 三个只读同源接口。默认每 6 小时检查远端，浏览器每 15 分钟或窗口重新获得焦点时刷新 Host 内容状态。
 
 可视化的**显示讯息框**、**自动轮转讯息**、**轮转讯息来源**和**轮转间隔**字段编辑同一组设置。讯息来源是至少保留一项的多选配置。Cordis 配置值是部署默认层；保存后的可视化选择成为 Host 设置文档中的用户覆盖层，在当前页面生效，并在刷新后保留。点击**恢复部署默认值**会删除四个字段的覆盖。
+
+### 内容同步与降级链路
+
+Host 获取 HTTPS Manifest 后先验证 Ed25519 签名，再下载清单列出的 NDJSON 来源文件，并逐个校验字节数和 SHA-256。危险路径、重复 ID、过期内容、原始 HTML、超限正文和字段格式错误都会被拒绝；同步失败不会覆盖最近一次有效修订。
+
+通过验证的内容默认写入 `$DSH_HOME/storages/breakpeek-content.sqlite`。启动或网络异常时优先使用最近有效的 SQLite 快照；不存在有效快照时，浏览器才使用插件内置的小型兜底内容池。三个同源接口的职责分别是：
+
+- `/breakpeek/api/v1/catalog`：资料库定义和当前修订。
+- `/breakpeek/api/v1/items`：经过筛选和分页的讯息对象。
+- `/breakpeek/api/v1/status`：同步、缓存与降级状态。
+
+Host 默认每 6 小时检查新修订；浏览器每 15 分钟以及窗口重新获得焦点时向 Host 刷新。R2 发布凭据和内容签名私钥始终留在内容仓库的发布环境中，不会进入插件包或浏览器 bundle。
 
 ## 开发与验证流程
 
@@ -105,7 +136,7 @@ pnpm dsh plugin --profile web remove @runnerzhang/dsh-client-ui-breakpeek
 
 ## Model Experience
 
-### 本地展示
+### 仅界面展示
 
 #### What the model sees
 
@@ -113,13 +144,16 @@ pnpm dsh plugin --profile web remove @runnerzhang/dsh-client-ui-breakpeek
 
 #### Token effect
 
-零。展示和轮换本地内容不发送模型请求。
+零。展示和轮换远程、缓存或内置内容都不会发送模型请求。
 
 #### KV Cache effect
 
 无。插件不改变模型请求内容，不会使可复用的请求前缀失效。
 
-## Known Limitations and Deferred Work
+## 已知限制与后续工作
 
-- **发布配置：** R2 Bucket、公开读取地址、公私钥和 GitHub Environment 由部署者配置，不随 npm 包分发。
+- **生产内容入口：** 当前 bundle 默认使用已签名的 R2 staging 目录；稳定版发布前需切换到生产自定义域名和 production 签名公钥。
+- **更新时效：** 远程内容采用定时轮询，不是实时推送。
+- **SQLite 运行时：** 最近有效缓存依赖 Node 内置的 `node:sqlite`，受支持的 Node 版本仍会提示该 API 处于 experimental 状态。
+- **发布配置：** R2 Bucket、公开读取地址、私钥和 GitHub Environment 由部署者维护，不随 npm 包分发。
 - **浮层依赖：** 组件通过 DOM 属性寻找容器；容器缺失时不渲染。

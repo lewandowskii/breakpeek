@@ -8,6 +8,23 @@ The browser plugin registers `breakpeek` into the session-scoped `conversation.i
 
 The panel does not inspect conversation activity or wait for a silence threshold. `visible` is its persisted open state. The close button writes `visible: false`, and the visual settings card can open it again. Drag the unmarked space in the header to reposition the panel; pointer movement is clamped to the visible viewport, and the focused drag area also accepts arrow keys. Messages with a `detail` field show an expand arrow and open an independently scrollable detail area. Details normally open above the panel, but switch below it when the upper edge would leave the viewport. Preview-only messages remain plain text. Expanded details pause automatic rotation. Collapsing restarts a complete `rotationIntervalMs`, while the previous and next buttons collapse any open detail and switch immediately. `contentSources` selects which dynamic libraries participate in both manual and automatic rotation. Remote failure falls back to the SQLite cache and then the built-in pool.
 
+## Install
+
+After the package is published, install the prebuilt bundle into a DSH Web profile:
+
+```sh
+dsh plugin --profile web add @runnerzhang/dsh-client-ui-breakpeek
+dsh web
+```
+
+Breakpeek declares a `dsh.bundle` layer, so `dsh plugin` adds both the npm dependency and the bundle entry to the selected profile. Remove both with:
+
+```sh
+dsh plugin --profile web remove @runnerzhang/dsh-client-ui-breakpeek
+```
+
+## Configuration
+
 ```yaml
 - name: '@runnerzhang/dsh-client-ui-breakpeek'
   config:
@@ -23,9 +40,30 @@ The panel does not inspect conversation activity or wait for a silence threshold
       - interview-ai
       - life-knowledge
       - coding-tips
+    contentCatalogUrl: https://content.example.com/production/manifest.json
+    contentPublicKeys:
+      production-2026: |-
+        -----BEGIN PUBLIC KEY-----
+        REPLACE_WITH_THE_TRUSTED_ED25519_PUBLIC_KEY
+        -----END PUBLIC KEY-----
+    allowUnsignedContent: false
+    contentRefreshIntervalMs: 21600000
+    contentRequestTimeoutMs: 10000
 ```
 
 The visual **Show message panel**, **Rotate messages automatically**, **Message sources**, and **Rotation interval** fields edit the same settings. Message sources are a multi-select with at least one library retained. Cordis values are the deployment base; saved visual choices become user overrides in the Host settings document, take effect on the current page, and survive reloads. **Reset to deployment default** removes all four overrides.
+
+### Content delivery and fallback
+
+The Host fetches the HTTPS manifest, verifies its Ed25519 signature, downloads the listed NDJSON source files, and verifies each declared byte size and SHA-256 digest before publishing a new revision. It rejects unsafe paths, duplicate identifiers, expired items, raw HTML, oversized documents, and malformed fields. A failed refresh never replaces a known-good revision.
+
+Validated content is written to `$DSH_HOME/storages/breakpeek-content.sqlite` by default. On startup or network failure, Breakpeek uses the most recent valid SQLite snapshot; if no valid snapshot exists, the browser uses the small built-in pool. The Host exposes only read-only, same-origin endpoints:
+
+- `/breakpeek/api/v1/catalog` — source definitions and active revision.
+- `/breakpeek/api/v1/items` — filtered, paginated content items.
+- `/breakpeek/api/v1/status` — synchronization and fallback status.
+
+The Host checks for a new revision every six hours by default. The browser refreshes from the Host every 15 minutes and whenever the window regains focus. Publishing credentials and signing private keys remain outside the plugin and browser bundle.
 
 ## Development and validation
 
@@ -94,7 +132,7 @@ Per the project rule in [SPEC.md](SPEC.md), UI inspection may run directly. Buil
 
 ## Model Experience
 
-### Local display
+### UI-only display
 
 #### What the model sees
 
@@ -102,7 +140,7 @@ Nothing. Remote or fallback text is presentation-only; the plugin does not add m
 
 #### Token effect
 
-Zero. Displaying and rotating local content sends no model request.
+Zero. Displaying and rotating remote, cached, or built-in content sends no model request.
 
 #### KV Cache effect
 
@@ -110,5 +148,7 @@ None. The plugin does not change model request content or invalidate a reusable 
 
 ## Known Limitations and Deferred Work
 
-- **Local content only:** message objects support previews and optional inline details, but remote content sources are still deferred in the SPEC.
+- **Production content endpoint:** the bundled profile currently uses the signed R2 staging catalog; replace it with a production custom domain and production signing key before a stable release.
+- **Host refresh granularity:** remote updates are polling-based rather than pushed in real time.
+- **SQLite runtime:** the last-known-good cache uses Node's built-in `node:sqlite`, which is still reported as experimental by supported Node releases.
 - **Overlay dependency:** the component finds its host by DOM attribute; an absent host renders nothing.
